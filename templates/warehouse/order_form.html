@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}{% if is_create %}新建{% else %}编辑{% endif %}{% if kind == 'transfer' %}移库单{% else %}出库单{% endif %}{% endblock %}
+{% block breadcrumb %}{% if kind == 'transfer' %}移库管理{% else %}出库管理{% endif %} / {% if is_create %}新建{% else %}编辑{% endif %}{% endblock %}
+{% block content %}
+<section class="page-head form-page-head">
+  <div>
+    <a class="back-link" href="{% if is_create %}{% if kind == 'transfer' %}{% url 'transfer_list' %}{% else %}{% url 'outbound_list' %}{% endif %}{% else %}{{ order.get_absolute_url }}{% endif %}">← 返回{% if kind == 'transfer' %}移库管理{% else %}出库管理{% endif %}</a>
+    <h1>{% if is_create %}新建{% else %}编辑{% endif %}{% if kind == 'transfer' %}移库单{% else %}出库单{% endif %}</h1>
+    <p class="page-sub">{% if kind == 'transfer' %}同一仓库内调整药材所在库位，完成时同步扣减与增加库存，总库存不变。{% else %}药材从库位出库，确认执行后扣减库存并生成可追溯流水。{% endif %}</p>
+  </div>
+  {% if order and not is_create %}
+  <div class="head-actions">
+    <span class="status status-{{ order.status_tone }}">{{ order.get_status_display }}</span>
+  </div>
+  {% endif %}
+</section>
+
+{% if form.non_field_errors %}
+<div class="form-alert">{% for error in form.non_field_errors %}<span>{{ error }}</span>{% endfor %}</div>
+{% endif %}
+
+<form method="post" class="order-form" id="order-form" data-kind="{{ kind }}" data-stock-url="{% url 'stock_batches_api' %}" novalidate>
+  {% csrf_token %}
+  <div class="form-layout">
+    <section class="panel form-card">
+      <div class="panel-head">
+        <div>
+          <h2>基础信息</h2>
+          <p>药材、批次与数量决定库存校验口径</p>
+        </div>
+        <span class="step-chip">第 1 步 / 共 2 步</span>
+      </div>
+
+      <div class="form-grid">
+        <div class="field {% if form.herb.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.herb.id_for_label }}">{{ form.herb.label }} <em>*</em></label>
+          {{ form.herb }}
+          {% for error in form.herb.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field {% if form.quantity.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.quantity.id_for_label }}">{{ form.quantity.label }} <em>*</em></label>
+          <div class="input-suffix">
+            {{ form.quantity }}
+            <span class="unit-label" id="unit-label">kg</span>
+          </div>
+          {% for error in form.quantity.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        {% if kind == 'transfer' %}
+        <div class="field {% if form.batch_no.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.batch_no.id_for_label }}">{{ form.batch_no.label }} <em>*</em></label>
+          {{ form.batch_no }}
+          <p class="field-help">选择药材和移出库位后，可输入或选择该库位现有批次。</p>
+          {% for error in form.batch_no.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field {% if form.from_location.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.from_location.id_for_label }}">{{ form.from_location.label }} <em>*</em></label>
+          {{ form.from_location }}
+          {% for error in form.from_location.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field {% if form.to_location.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.to_location.id_for_label }}">{{ form.to_location.label }} <em>*</em></label>
+          {{ form.to_location }}
+          {% for error in form.to_location.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field field-full {% if form.reason.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.reason.id_for_label }}">{{ form.reason.label }} <em>*</em></label>
+          {{ form.reason }}
+          <p class="field-help">写明移库原因，例如货架调整、就近存放、批次合并，便于日后审计。</p>
+          {% for error in form.reason.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        {% else %}
+        <div class="field {% if form.outbound_type.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.outbound_type.id_for_label }}">{{ form.outbound_type.label }} <em>*</em></label>
+          {{ form.outbound_type }}
+          {% for error in form.outbound_type.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field {% if form.location.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.location.id_for_label }}">{{ form.location.label }} <em>*</em></label>
+          {{ form.location }}
+          {% for error in form.location.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field {% if form.batch_no.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.batch_no.id_for_label }}">{{ form.batch_no.label }} <em>*</em></label>
+          {{ form.batch_no }}
+          <p class="field-help">选择药材和出库库位后，可输入或选择该库位现有批次。</p>
+          {% for error in form.batch_no.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field {% if form.recipient.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.recipient.id_for_label }}">{{ form.recipient.label }} <em>*</em></label>
+          {{ form.recipient }}
+          {% for error in form.recipient.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="field field-full {% if form.purpose.errors %}has-error{% endif %}">
+          <label class="field-label" for="{{ form.purpose.id_for_label }}">{{ form.purpose.label }} <em>*</em></label>
+          {{ form.purpose }}
+          <p class="field-help">出库用途是审计与追溯的关键字段，请尽量写明科室、处方或处理原因。</p>
+          {% for error in form.purpose.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="form-divider"></div>
+      <div class="form-actions">
+        <button type="submit" name="action" value="draft" class="btn btn-ghost">保存草稿</button>
+        <button type="submit" name="action" value="submit" class="btn btn-primary">保存并提交审核 →</button>
+        <span class="form-actions-note">提交后由仓库主管审核，审核通过才能执行库存变更。</span>
+      </div>
+    </section>
+
+    <aside class="form-side">
+      <section class="panel side-card">
+        <div class="side-card-head">
+          <h2>库存预检</h2>
+          <span class="live-dot">实时</span>
+        </div>
+        <p class="side-help">选择药材与{% if kind == 'transfer' %}移出{% else %}出库{% endif %}库位后，系统自动显示可用批次。</p>
+        <div class="stock-preview" id="stock-preview" data-kind="{{ kind }}">
+          <div class="stock-empty" id="stock-empty">
+            <span class="stock-empty-mark">仓</span>
+            <p>尚未选择完整</p>
+            <small>请先选择药材和库位</small>
+          </div>
+          <div class="stock-ready" id="stock-ready" hidden>
+            <div class="stock-total-row">
+              <span>可用合计</span>
+              <strong><em id="stock-total">0</em> <small id="stock-unit">kg</small></strong>
+            </div>
+            <ul class="batch-list" id="stock-batches"></ul>
+            <p class="stock-warning" id="stock-warning" hidden>数量超过可用库存，提交时会被拦截。</p>
+          </div>
+        </div>
+        <div class="stock-error" id="stock-error" hidden></div>
+      </section>
+
+      <section class="panel side-card guide-card">
+        <h2>操作提示</h2>
+        <ol class="guide-list">
+          <li><strong>先存草稿</strong><span>可反复编辑，不占用库存。</span></li>
+          <li><strong>提交审核</strong><span>系统预检库存，主管通过或驳回。</span></li>
+          <li><strong>确认执行</strong><span>锁定库存行，扣减/转移并生成流水。</span></li>
+          <li><strong>异常留档</strong><span>执行失败、库位异常均可补充备注与附件。</span></li>
+        </ol>
+      </section>
+
+      {% if order and order.exception_note %}
+      <section class="panel side-card note-card">
+        <h2>已有异常备注</h2>
+        <p class="preserve-note">{{ order.exception_note|linebreaksbr }}</p>
+      </section>
+      {% endif %}
+    </aside>
+  </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+  window.ORDER_KIND = "{{ kind }}";
+</script>
+{% endblock %}

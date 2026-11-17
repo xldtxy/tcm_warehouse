@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}{{ batch.herb.name }} · {{ batch.batch_no }}{% endblock %}
+{% block breadcrumb %}库存批次 / {{ batch.batch_no }}{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <a class="back-link" href="{% url 'stock_list' %}">← 返回库存批次</a>
+    <div class="detail-title-row"><h1>{{ batch.herb.name }}</h1><span class="code">{{ batch.batch_no }}</span>{% if batch.is_low_stock %}<span class="status status-warning">低库存</span>{% else %}<span class="status status-success">正常</span>{% endif %}</div>
+    <p class="page-sub">{{ batch.location.warehouse.name }} / {{ batch.location.code }} {{ batch.location.name }} · {{ batch.herb.spec|default:"未填写规格" }}</p>
+  </div>
+  {% if can_manage %}<div class="head-actions"><a href="{% url 'stock_edit' batch.pk %}" class="btn btn-primary">编辑 / 盘点调整</a></div>{% endif %}
+</section>
+
+<div class="detail-layout">
+  <div class="detail-main">
+    <section class="panel">
+      <div class="panel-head"><div><h2>批次库存</h2><p>库存变化必须通过业务单据或盘点调整</p></div></div>
+      <div class="batch-hero">
+        <div><span>当前库存</span><strong>{{ batch.quantity|qty }}<small>{{ batch.herb.unit }}</small></strong></div>
+        <div><span>安全库存</span><strong>{{ batch.herb.safety_stock|qty }}<small>{{ batch.herb.unit }}</small></strong></div>
+        <div><span>所在库位</span><strong class="batch-location">{{ batch.location.code }}</strong><small>{{ batch.location.warehouse.name }}</small></div>
+      </div>
+      <dl class="info-grid">
+        <div><dt>药材编码</dt><dd>{{ batch.herb.code }}</dd></div><div><dt>规格</dt><dd>{{ batch.herb.spec|default:"—" }}</dd></div>
+        <div><dt>生产日期</dt><dd>{{ batch.production_date|date:"Y-m-d"|default:"—" }}</dd></div><div><dt>有效期至</dt><dd>{{ batch.expiry_date|date:"Y-m-d"|default:"—" }}</dd></div>
+        <div><dt>最近更新</dt><dd>{{ batch.updated_at|date:"Y-m-d H:i" }}</dd></div><div><dt>批次状态</dt><dd>{% if batch.is_low_stock %}低于安全库存{% else %}库存正常{% endif %}</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>批次流水</h2><p>最近 50 条变动记录</p></div><a href="{% url 'stock_query' %}?q={{ batch.batch_no }}" class="text-link">完整查询 →</a></div>
+      {% if movements %}
+      <div class="table-wrap"><table class="data-table compact-table"><thead><tr><th>时间</th><th>业务类型</th><th>单号</th><th>变动类型</th><th class="num">变动</th><th class="num">前</th><th class="num">后</th><th>操作人</th></tr></thead><tbody>
+        {% for movement in movements %}
+        <tr><td>{{ movement.created_at|date:"Y-m-d H:i" }}</td><td>{{ movement.get_order_type_display }}</td><td>{% if movement.order_type == 'inbound' and movement.order_id %}<a class="order-link" href="{% url 'inbound_detail' movement.order_id %}">{{ movement.order_no }}</a>{% elif movement.order_type == 'transfer' and movement.order_id %}<a class="order-link" href="{% url 'transfer_detail' movement.order_id %}">{{ movement.order_no }}</a>{% elif movement.order_type == 'outbound' and movement.order_id %}<a class="order-link" href="{% url 'outbound_detail' movement.order_id %}">{{ movement.order_no }}</a>{% else %}<span class="muted">期初/手工</span>{% endif %}</td><td>{{ movement.get_movement_type_display }}</td><td class="num {% if movement.is_increase %}qty-in{% else %}qty-out{% endif %}">{{ movement.quantity|signed }}</td><td class="num">{{ movement.before_quantity|qty }}</td><td class="num">{{ movement.after_quantity|qty }}</td><td>{{ movement.operator.profile.display_name|default:movement.operator.username|default:"系统" }}</td></tr>
+        {% endfor %}
+      </tbody></table></div>
+      {% else %}<div class="empty-inline compact">还没有库存流水。</div>{% endif %}
+    </section>
+  </div>
+  <aside class="detail-side">
+    <section class="panel side-card"><h2>库存规则</h2><p class="side-help">库存调整会生成一条 ADJUST 流水，记录调整前后数量、原因和操作人，不能直接覆盖历史。</p><div class="inventory-figure"><span>当前可操作库存</span><strong>{{ batch.quantity|qty }}<small>{{ batch.herb.unit }}</small></strong><em>{{ batch.location.full_name }}</em></div></section>
+    {% if can_manage %}
+    <section class="panel side-card"><h2>删除空批次</h2><p class="side-footnote">只有库存为 0 且没有任何流水的批次可以删除。正常业务请使用盘点调整或停用。</p><form method="post" action="{% url 'stock_delete' batch.pk %}" onsubmit="return confirm('确认删除这个空批次吗？');">{% csrf_token %}<button type="submit" class="btn btn-danger-ghost btn-block">删除空批次</button></form></section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

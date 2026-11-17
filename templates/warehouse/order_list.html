@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}{{ list_title }}{% endblock %}
+{% block breadcrumb %}{{ list_title }}{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">STUDENT 4 · 移库出库管理</p>
+    <h1>{{ list_title }}</h1>
+    <p class="page-sub">{{ list_sub }}</p>
+  </div>
+  <div class="head-actions">
+    {% if can_create %}
+    <a href="{% url create_url_name %}" class="btn btn-primary">＋ 新建{{ kind_label }}</a>
+    {% endif %}
+  </div>
+</section>
+
+{% if filters.errors %}
+<div class="form-alert">
+  {% for error in filters.errors %}<span>{{ error }}</span>{% endfor %}
+</div>
+{% endif %}
+
+<div class="status-tabs" role="tablist" aria-label="按状态筛选">
+  <a href="?{% query_replace status='' page='' %}" class="status-tab {% if not filters.status %}active{% endif %}">
+    全部 <span>{{ total_count }}</span>
+  </a>
+  {% for tab in status_tabs %}
+  <a href="?{% query_replace status=tab.value page='' %}" class="status-tab {% if tab.active %}active{% endif %}">
+    {{ tab.label }} <span>{{ tab.count }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+<section class="panel filter-panel">
+  <form method="get" class="filter-form">
+    {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+    <label class="filter-field filter-search">
+      <span>关键字</span>
+      <input type="search" name="q" value="{{ filters.q }}" class="form-input" placeholder="单号 / 药材 / 批次 / 申请人{% if kind == 'outbound' %} / 领用人{% endif %}">
+    </label>
+    <label class="filter-field">
+      <span>药材</span>
+      <select name="herb" class="form-select">
+        <option value="">全部药材</option>
+        {% for herb in herbs %}
+        <option value="{{ herb.pk }}" {% if filters.herb == herb.pk|stringformat:'s' %}selected{% endif %}>{{ herb.name }}（{{ herb.code }}）</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>开始日期</span>
+      <input type="date" name="date_from" value="{{ filters.date_from }}" class="form-input">
+    </label>
+    <label class="filter-field">
+      <span>结束日期</span>
+      <input type="date" name="date_to" value="{{ filters.date_to }}" class="form-input">
+    </label>
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary">筛选</button>
+      {% if filters.has_filters %}
+      <a href="?{% query_replace q='' status='' herb='' date_from='' date_to='' page='' %}" class="btn btn-ghost">重置</a>
+      {% endif %}
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head list-head">
+    <div>
+      <h2>{% if filters.status %}{{ filters.status|status_label }}{% else %}全部{% endif %}{{ kind_label }}</h2>
+      <p>共 {{ page_obj.paginator.count }} 条记录{% if filters.has_filters %}（已筛选）{% endif %}</p>
+    </div>
+    <div class="legend">
+      <span><i class="legend-dot dot-draft"></i>草稿</span>
+      <span><i class="legend-dot dot-pending"></i>待审核</span>
+      <span><i class="legend-dot dot-approved"></i>已审核</span>
+      <span><i class="legend-dot dot-completed"></i>已完成</span>
+    </div>
+  </div>
+
+  {% if orders %}
+  <div class="table-wrap">
+    <table class="data-table order-table">
+      <thead>
+        <tr>
+          <th>单据编号</th>
+          <th>药材 / 批次</th>
+          <th>{% if kind == 'transfer' %}移库路径{% else %}出库去向{% endif %}</th>
+          <th class="num">数量</th>
+          <th>状态</th>
+          <th>申请人</th>
+          <th>审核人</th>
+          <th>创建时间</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td>
+            <a class="order-link" href="{% url detail_url_name order.pk %}">
+              {% if kind == 'transfer' %}{{ order.transfer_no }}{% else %}{{ order.outbound_no }}{% endif %}
+            </a>
+            {% if order.exception_note %}<span class="mini-flag" title="有异常备注">异常</span>{% endif %}
+          </td>
+          <td>
+            <strong class="cell-strong">{{ order.herb.name }}</strong>
+            <small class="cell-sub">{{ order.batch_no }}{% if kind == 'outbound' %} · {{ order.get_outbound_type_display }}{% endif %}</small>
+          </td>
+          <td class="path-cell">
+            {% if kind == 'transfer' %}
+              <span class="loc-chip">{{ order.from_location.code }}</span>
+              <span class="path-arrow">→</span>
+              <span class="loc-chip loc-chip-in">{{ order.to_location.code }}</span>
+            {% else %}
+              <span class="loc-chip">{{ order.location.code }}</span>
+              <span class="path-arrow">→</span>
+              <span class="dest-text">{{ order.recipient }}</span>
+            {% endif %}
+          </td>
+          <td class="num">{{ order.quantity|qty }} <small>{{ order.herb.unit }}</small></td>
+          <td><span class="status status-{{ order.status_tone }}">{{ order.get_status_display }}</span></td>
+          <td>
+            {{ order.applicant.profile.display_name|default:order.applicant.username }}
+            <small class="cell-sub">{{ order.created_at|date:"m-d H:i" }}</small>
+          </td>
+          <td>
+            {% if order.auditor %}
+              {{ order.auditor.profile.display_name|default:order.auditor.username }}
+              <small class="cell-sub">{{ order.audited_at|date:"m-d H:i" }}</small>
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td class="nowrap">{{ order.created_at|date:"Y-m-d" }}<small class="cell-sub">{{ order.created_at|date:"H:i" }}</small></td>
+          <td class="row-action"><a href="{% url detail_url_name order.pk %}" class="btn btn-tiny">查看</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="pagination" aria-label="分页">
+    <span class="page-info">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+    <div class="page-buttons">
+      {% if page_obj.has_previous %}
+      <a class="page-btn" href="?{% query_replace page=page_obj.previous_page_number %}">上一页</a>
+      {% else %}<span class="page-btn disabled">上一页</span>{% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if num == page_obj.number %}
+        <span class="page-btn active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <a class="page-btn" href="?{% query_replace page=num %}">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <a class="page-btn" href="?{% query_replace page=page_obj.next_page_number %}">下一页</a>
+      {% else %}<span class="page-btn disabled">下一页</span>{% endif %}
+    </div>
+  </nav>
+  {% endif %}
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-mark">{% if kind == 'transfer' %}移{% else %}出{% endif %}</span>
+    <h3>{% if filters.has_filters %}没有找到符合条件的{{ kind_label }}{% else %}还没有{{ kind_label }}{% endif %}</h3>
+    <p>{% if filters.has_filters %}可以调整关键字、药材或日期范围后再试。{% elif can_create %}从新建第一张{{ kind_label }}开始，系统会带你完成建单、审核与执行。{% else %}当前账号为只读角色，可查看已有单据与操作轨迹。{% endif %}</p>
+    {% if filters.has_filters %}
+    <a class="btn btn-ghost" href="?{% query_replace q='' status='' herb='' date_from='' date_to='' page='' %}">清除筛选</a>
+    {% elif can_create %}
+    <a class="btn btn-primary" href="{% url create_url_name %}">＋ 新建{{ kind_label }}</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

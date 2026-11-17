@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}仓库与库位{% endblock %}
+{% block breadcrumb %}基础资料 / 仓库与库位{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 1 · 基础资料</p>
+    <h1>仓库与库位</h1>
+    <p class="page-sub">仓库是库存和业务单据的归属单位；库位编码在同一个仓库内唯一。有关联库存或单据的仓库/库位不能删除，可编辑为停用。</p>
+  </div>
+  <div class="head-actions">
+    <a href="{% url 'location_create' %}" class="btn btn-ghost">＋ 新建库位</a>
+    <a href="{% url 'warehouse_create' %}" class="btn btn-primary">＋ 新建仓库</a>
+  </div>
+</section>
+
+{% for warehouse in warehouses %}
+<section class="panel warehouse-card">
+  <div class="panel-head">
+    <div>
+      <div class="warehouse-title">
+        <span class="code">{{ warehouse.code }}</span>
+        <h2>{{ warehouse.name }}</h2>
+        {% if not warehouse.is_active %}<span class="status status-muted">已停用</span>{% endif %}
+      </div>
+      <p>{{ warehouse.address|default:"未填写地址" }} · {{ warehouse.locations.count }} 个库位</p>
+    </div>
+    <div class="panel-tools">
+      <a href="{% url 'location_create' %}?warehouse={{ warehouse.pk }}" class="text-link">＋ 添加库位</a>
+      <a href="{% url 'warehouse_edit' warehouse.pk %}" class="text-link">编辑仓库</a>
+      <form method="post" action="{% url 'warehouse_delete' warehouse.pk %}" class="inline-form" onsubmit="return confirm('确认删除仓库 {{ warehouse.name }} 吗？');">
+        {% csrf_token %}<button type="submit" class="text-danger-link inline-danger">删除</button>
+      </form>
+    </div>
+  </div>
+  {% if warehouse.locations.all %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>库位编码</th><th>名称</th><th>库区</th><th>状态</th><th class="num">批次数</th><th></th></tr></thead>
+      <tbody>
+        {% for location in warehouse.locations.all %}
+        <tr>
+          <td><span class="code">{{ location.code }}</span></td>
+          <td>{{ location.name|default:"—" }}</td>
+          <td>{{ location.zone|default:"—" }}</td>
+          <td>{% if location.is_active %}<span class="status status-success">启用</span>{% else %}<span class="status status-muted">停用</span>{% endif %}</td>
+          <td class="num">{{ location.stock_batches.count }}</td>
+          <td class="row-action">
+            <a href="{% url 'location_edit' location.pk %}" class="btn btn-tiny">编辑</a>
+            <form method="post" action="{% url 'location_delete' location.pk %}" class="inline-form" onsubmit="return confirm('确认删除库位 {{ location.code }} 吗？');">
+              {% csrf_token %}<button type="submit" class="btn btn-tiny btn-danger-ghost">删除</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-inline compact">这个仓库还没有库位，先添加一个库位后再建立库存。</div>
+  {% endif %}
+</section>
+{% empty %}
+<div class="panel empty-state">
+  <span class="empty-mark">仓</span>
+  <h3>还没有仓库</h3>
+  <p>先建立一个中心仓库，再添加入库、出库和移库所需的库位。</p>
+  <a href="{% url 'warehouse_create' %}" class="btn btn-primary">新建仓库</a>
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.deps/
+.wheels/
+.chrome-profile/
+test_media/
+staticfiles/
+media/order_attachments/
+.env
+*.log
+.capture.js
+.chrome-pid
+shot-*.png

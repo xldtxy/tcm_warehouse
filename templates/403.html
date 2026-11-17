@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}访问被拒绝{% endblock %}
+{% block breadcrumb %}访问被拒绝{% endblock %}
+{% block content %}
+<div class="empty-state error-state">
+  <span class="empty-mark">403</span>
+  <h1>当前岗位无权执行此操作</h1>
+  <p>本系统的移库、审核、执行与档案维护按岗位分离。请返回工作台，或联系仓库主管确认权限。</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="{% url 'dashboard' %}">返回工作台</a>
+    <a class="btn btn-ghost" href="{% url 'transfer_list' %}">查看移库单</a>
+  </div>
+</div>
+{% endblock %}

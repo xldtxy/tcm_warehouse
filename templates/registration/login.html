@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · 本草仓</title>
+  <link rel="stylesheet" href="{% static 'warehouse/css/app.css' %}?v=20261030">
+</head>
+<body class="login-body">
+<div class="login-shell">
+  <section class="login-visual">
+    <div class="login-brand">
+      <span class="brand-seal brand-seal-lg">本</span>
+      <span>
+        <strong>本草仓</strong>
+        <small>TCM WAREHOUSE</small>
+      </span>
+    </div>
+    <div class="login-quote">
+      <p class="eyebrow">中药仓储库位管理系统</p>
+      <h1>一物一位，<br>一单一痕。</h1>
+      <p class="login-desc">把移库与出库的每一次交接，都留在可查询、可审核、可追溯的业务闭环里。</p>
+    </div>
+    <div class="login-flow">
+      <span>建单</span><i></i><span>审核</span><i></i><span>执行</span><i></i><span>留痕</span>
+    </div>
+    <div class="login-foot">Python · Django · MySQL / SQLite</div>
+  </section>
+
+  <section class="login-panel">
+    <div class="login-form-wrap">
+      <p class="eyebrow">欢迎回来</p>
+      <h2>登录业务工作台</h2>
+      <p class="muted">请使用课程演示账号登录，不同岗位拥有不同操作权限。</p>
+
+      {% if form.non_field_errors %}
+      <div class="form-alert">{{ form.non_field_errors|join:"；" }}</div>
+      {% endif %}
+      {% if next %}
+      <div class="form-alert form-alert-info">登录后将返回你刚才访问的页面。</div>
+      {% endif %}
+
+      <form method="post" class="login-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        <label class="field">
+          <span class="field-label">账号</span>
+          <input type="text" name="username" class="form-input" autocomplete="username" autofocus required placeholder="请输入用户名">
+        </label>
+        <label class="field">
+          <span class="field-label">密码</span>
+          <input type="password" name="password" class="form-input" autocomplete="current-password" required placeholder="请输入密码">
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">进入本草仓 <span>→</span></button>
+      </form>
+
+      <div class="demo-accounts">
+        <p class="demo-title">课程演示账号 <span>点击自动填入</span></p>
+        <button type="button" class="demo-account" data-user="keeper" data-pass="keeper123">
+          <span class="demo-avatar">仓</span>
+          <span><strong>仓管员</strong><small>keeper / keeper123</small></span>
+          <em>建单 · 执行</em>
+        </button>
+        <button type="button" class="demo-account" data-user="manager" data-pass="manager123">
+          <span class="demo-avatar">管</span>
+          <span><strong>仓库主管</strong><small>manager / manager123</small></span>
+          <em>审核 · 驳回</em>
+        </button>
+        <button type="button" class="demo-account" data-user="admin" data-pass="admin123">
+          <span class="demo-avatar">管</span>
+          <span><strong>系统管理员</strong><small>admin / admin123</small></span>
+          <em>全部权限</em>
+        </button>
+      </div>
+      <p class="login-tip">还没有账号？<a href="{% url 'signup' %}">注册新用户</a> · 演示密码仅用于本地课程验收，部署前请修改。</p>
+    </div>
+  </section>
+</div>
+<script src="{% static 'warehouse/js/app.js' %}?v=20261030"></script>
+</body>
+</html>

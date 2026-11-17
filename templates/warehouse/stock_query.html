@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}库存查询{% endblock %}
+{% block breadcrumb %}查询与审计 / 库存查询{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 5 · 库存查询与统计</p>
+    <h1>库存流水查询</h1>
+    <p class="page-sub">按时间、操作人、药材、业务对象和变动类型组合查询库存变化，查看统计汇总、导出 CSV 或打印归档。</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-ghost" href="{% url 'stock_query_print' %}?{% query_replace %}">打印页面</a>
+    {% if role_permissions|get_item:'export.data' %}<a class="btn btn-primary" href="{% url 'stock_query_export' %}?{% query_replace %}">导出 CSV</a>{% endif %}
+  </div>
+</section>
+
+<section class="stat-grid compact-stats">
+  <article class="stat-card"><div class="stat-top"><span>入库合计</span><span class="stat-icon green">入</span></div><strong class="stat-value">{{ incoming|qty }}<small> kg</small></strong><p class="stat-note">期初 + 采购入库 + 移入</p></article>
+  <article class="stat-card"><div class="stat-top"><span>出库合计</span><span class="stat-icon red">出</span></div><strong class="stat-value">{{ outgoing|qty }}<small> kg</small></strong><p class="stat-note">出库 + 移出 + 盘点差异</p></article>
+  <article class="stat-card"><div class="stat-top"><span>流水条数</span><span class="stat-icon blue">流</span></div><strong class="stat-value">{{ movement_count }}<small> 条</small></strong><p class="stat-note">当前筛选结果</p></article>
+  <article class="stat-card"><div class="stat-top"><span>当前库存批次</span><span class="stat-icon amber">库</span></div><strong class="stat-value">{{ snapshot.batch_count }}<small> 批</small></strong><p class="stat-note">{{ snapshot.stock_total|qty }} kg · {{ snapshot.low_count }} 批低库存</p></article>
+</section>
+
+<section class="panel filter-panel">
+  <form method="get" class="filter-form filter-form-report">
+    <label class="filter-field filter-search"><span>关键字</span><input type="search" name="q" value="{{ filters.q }}" class="form-input" placeholder="药材 / 批次 / 单号 / 库位 / 备注"></label>
+    <label class="filter-field"><span>开始日期</span><input type="date" name="date_from" value="{{ filters.date_from }}" class="form-input"></label>
+    <label class="filter-field"><span>结束日期</span><input type="date" name="date_to" value="{{ filters.date_to }}" class="form-input"></label>
+    <label class="filter-field"><span>操作人</span><select name="operator" class="form-select"><option value="">全部</option>{% for user in operators %}<option value="{{ user.pk }}" {% if filters.operator == user.pk|stringformat:'s' %}selected{% endif %}>{{ user.profile.display_name|default:user.username }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>药材</span><select name="herb" class="form-select"><option value="">全部</option>{% for herb in herbs %}<option value="{{ herb.pk }}" {% if filters.herb == herb.pk|stringformat:'s' %}selected{% endif %}>{{ herb.name }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>业务对象</span><select name="order_type" class="form-select"><option value="">全部</option>{% for value,label in order_types %}<option value="{{ value }}" {% if filters.order_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>变动类型</span><select name="movement_type" class="form-select"><option value="">全部</option>{% for value,label in movement_types %}<option value="{{ value }}" {% if filters.movement_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <div class="filter-actions"><button class="btn btn-primary">查询</button><a href="{% url 'stock_query' %}" class="btn btn-ghost">重置</a></div>
+  </form>
+</section>
+
+<div class="report-grid">
+  <section class="panel chart-panel wide-chart">
+    <div class="panel-head"><div><h2>出入库趋势</h2><p>当前筛选范围内按日汇总</p></div><div class="chart-legend"><span><i class="legend-dot dot-completed"></i>入库</span><span><i class="legend-dot dot-rejected"></i>出库</span></div></div>
+    <div class="dual-chart">
+      {% for bar in chart %}
+      <div class="dual-col" title="{{ bar.date|date:'Y-m-d' }}：入库 {{ bar.incoming|qty }} / 出库 {{ bar.outgoing|qty }}">
+        <div class="dual-bars"><i class="bar-in" style="height: {{ bar.incoming_height }}%"></i><i class="bar-out" style="height: {{ bar.outgoing_height }}%"></i></div>
+        <span>{{ bar.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel side-card">
+    <h2>库存分布</h2>
+    <p class="side-help">{{ snapshot.herb_count }} 味启用药材，{{ snapshot.stock_total|qty }} kg 当前库存。</p>
+    {% for row in snapshot.by_warehouse %}<div class="rank-row"><span>{{ row.location__warehouse__name }}</span><strong>{{ row.total|qty }} kg</strong></div>{% empty %}<div class="empty-inline compact">暂无库存。</div>{% endfor %}
+    <div class="panel-divider"></div>
+    <h2>流水 Top 药材</h2>
+    {% for row in top_herbs %}<div class="rank-row"><span>{{ row.batch__herb__name }}</span><strong>{{ row.total|qty }} {{ row.batch__herb__unit }}</strong></div>{% empty %}<div class="empty-inline compact">暂无流水。</div>{% endfor %}
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel-head list-head"><div><h2>库存流水明细</h2><p>共 {{ page_obj.paginator.count }} 条{% if filters.has_filters %}（已筛选）{% endif %}</p></div></div>
+  {% if movements %}
+  <div class="table-wrap"><table class="data-table order-table"><thead><tr><th>时间</th><th>业务对象</th><th>单号</th><th>药材 / 批次</th><th>库位</th><th>变动类型</th><th class="num">变动</th><th class="num">变动前</th><th class="num">变动后</th><th>操作人</th></tr></thead><tbody>
+    {% for movement in movements %}
+    <tr>
+      <td class="nowrap">{{ movement.created_at|date:"Y-m-d" }}<small class="cell-sub">{{ movement.created_at|date:"H:i:s" }}</small></td>
+      <td><span class="type-tag">{{ movement.get_order_type_display }}</span></td>
+      <td>{% if movement.order_type == 'inbound' and movement.order_id %}<a class="order-link" href="{% url 'inbound_detail' movement.order_id %}">{{ movement.order_no }}</a>{% elif movement.order_type == 'transfer' and movement.order_id %}<a class="order-link" href="{% url 'transfer_detail' movement.order_id %}">{{ movement.order_no }}</a>{% elif movement.order_type == 'outbound' and movement.order_id %}<a class="order-link" href="{% url 'outbound_detail' movement.order_id %}">{{ movement.order_no }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td><strong>{{ movement.batch.herb.name }}</strong><small class="cell-sub">{{ movement.batch.batch_no }}</small></td>
+      <td><span class="loc-chip">{{ movement.batch.location.code }}</span></td>
+      <td>{{ movement.get_movement_type_display }}</td>
+      <td class="num {% if movement.is_increase %}qty-in{% else %}qty-out{% endif %}">{{ movement.quantity|signed }} <small>{{ movement.batch.herb.unit }}</small></td>
+      <td class="num">{{ movement.before_quantity|qty }}</td>
+      <td class="num">{{ movement.after_quantity|qty }}</td>
+      <td>{{ movement.operator.profile.display_name|default:movement.operator.username|default:"系统" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody></table></div>
+  {% if page_obj.paginator.num_pages > 1 %}<nav class="pagination"><span class="page-info">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span><div class="page-buttons">{% if page_obj.has_previous %}<a class="page-btn" href="?{% query_replace page=page_obj.previous_page_number %}">上一页</a>{% endif %}{% for num in page_obj.paginator.page_range %}{% if num == page_obj.number %}<span class="page-btn active">{{ num }}</span>{% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}<a class="page-btn" href="?{% query_replace page=num %}">{{ num }}</a>{% endif %}{% endfor %}{% if page_obj.has_next %}<a class="page-btn" href="?{% query_replace page=page_obj.next_page_number %}">下一页</a>{% endif %}</div></nav>{% endif %}
+  {% else %}<div class="empty-inline">没有符合条件的库存流水。</div>{% endif %}
+</section>
+{% endblock %}

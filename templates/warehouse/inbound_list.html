@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}入库管理{% endblock %}
+{% block breadcrumb %}业务办理 / 入库管理{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 3 · 入库管理</p>
+    <h1>入库管理</h1>
+    <p class="page-sub">入库单支持多药材、多批次、多库位明细；提交后由主管验收，验收通过后由仓管确认入库，库存此时才增加。</p>
+  </div>
+  {% if can_create %}<a href="{% url 'inbound_create' %}" class="btn btn-primary">＋ 新建入库单</a>{% endif %}
+</section>
+
+{% if filters.errors %}<div class="form-alert">{% for error in filters.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+
+<div class="status-tabs">
+  <a href="?{% query_replace status='' page='' %}" class="status-tab {% if not filters.status %}active{% endif %}">全部 <span>{{ total_count }}</span></a>
+  {% for tab in status_tabs %}<a href="?{% query_replace status=tab.value page='' %}" class="status-tab {% if tab.active %}active{% endif %}">{{ tab.label }} <span>{{ tab.count }}</span></a>{% endfor %}
+</div>
+
+<section class="panel filter-panel">
+  <form method="get" class="filter-form">
+    {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+    <label class="filter-field filter-search"><span>关键字</span><input type="search" name="q" value="{{ filters.q }}" class="form-input" placeholder="入库单 / 供应商 / 药材 / 批次"></label>
+    <label class="filter-field"><span>供应商</span><select name="supplier" class="form-select"><option value="">全部供应商</option>{% for supplier in suppliers %}<option value="{{ supplier.pk }}" {% if filters.supplier == supplier.pk|stringformat:'s' %}selected{% endif %}>{{ supplier.name }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>入库日期起</span><input type="date" name="date_from" value="{{ filters.date_from }}" class="form-input"></label>
+    <label class="filter-field"><span>入库日期止</span><input type="date" name="date_to" value="{{ filters.date_to }}" class="form-input"></label>
+    <div class="filter-actions"><button class="btn btn-primary">筛选</button><a href="{% url 'inbound_list' %}" class="btn btn-ghost">重置</a></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head list-head"><div><h2>入库单</h2><p>共 {{ page_obj.paginator.count }} 张</p></div><div class="legend"><span><i class="legend-dot dot-pending"></i>待验收</span><span><i class="legend-dot dot-approved"></i>验收通过</span><span><i class="legend-dot dot-completed"></i>已入库</span></div></div>
+  {% if orders %}
+  <div class="table-wrap"><table class="data-table order-table"><thead><tr><th>入库单号</th><th>供应商</th><th>仓库</th><th class="num">明细</th><th class="num">合计数量</th><th>状态</th><th>申请人</th><th>入库日期</th><th></th></tr></thead><tbody>
+    {% for order in orders %}
+    <tr>
+      <td><a class="order-link" href="{% url 'inbound_detail' order.pk %}">{{ order.inbound_no }}</a><small class="cell-sub">{{ order.created_at|date:"m-d H:i" }}</small></td>
+      <td>{{ order.supplier.name }}</td>
+      <td>{{ order.warehouse.name }}</td>
+      <td class="num">{{ order.items.count }}</td>
+      <td class="num">{{ order.total_quantity|qty }}</td>
+      <td><span class="status status-{{ order.status_tone }}">{{ order.status_label }}</span></td>
+      <td>{{ order.applicant.profile.display_name|default:order.applicant.username }}</td>
+      <td>{{ order.inbound_date|date:"Y-m-d" }}</td>
+      <td class="row-action"><a href="{% url 'inbound_detail' order.pk %}" class="btn btn-tiny">查看</a></td>
+    </tr>
+    {% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty-inline">没有符合条件的入库单。{% if can_create %}<a href="{% url 'inbound_create' %}">新建入库单</a>{% endif %}</div>{% endif %}
+</section>
+{% endblock %}

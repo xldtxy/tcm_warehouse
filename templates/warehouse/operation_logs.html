@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}操作日志{% endblock %}
+{% block breadcrumb %}查询与审计 / 操作日志{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 5 · 操作日志</p>
+    <h1>操作日志</h1>
+    <p class="page-sub">统一查看入库、移库、出库的创建、提交、审核、完成、异常和附件操作，支持按人员、动作和时间检索。</p>
+  </div>
+  {% if role_permissions|get_item:'export.data' %}<a class="btn btn-primary" href="{% url 'operation_logs_export' %}?{% query_replace %}">导出 CSV</a>{% endif %}
+</section>
+
+<section class="stat-grid compact-stats">
+  <article class="stat-card"><div class="stat-top"><span>日志总数</span><span class="stat-icon blue">志</span></div><strong class="stat-value">{{ page_obj.paginator.count }}<small> 条</small></strong><p class="stat-note">当前筛选范围</p></article>
+  <article class="stat-card"><div class="stat-top"><span>提交动作</span><span class="stat-icon amber">提</span></div><strong class="stat-value">{{ action_counts.submit|default:0 }}<small> 条</small></strong><p class="stat-note">入库 / 移库 / 出库</p></article>
+  <article class="stat-card"><div class="stat-top"><span>审核动作</span><span class="stat-icon green">审</span></div><strong class="stat-value">{{ action_counts.approve|default:0 }}<small> 条</small></strong><p class="stat-note">通过验收或审核</p></article>
+  <article class="stat-card"><div class="stat-top"><span>异常留档</span><span class="stat-icon red">异</span></div><strong class="stat-value">{{ action_counts.exception|default:0 }}<small> 条</small></strong><p class="stat-note">执行异常与处理说明</p></article>
+</section>
+
+<section class="panel filter-panel">
+  <form method="get" class="filter-form filter-form-report">
+    <label class="filter-field filter-search"><span>关键字</span><input type="search" name="q" value="{{ filters.q }}" class="form-input" placeholder="单号 / 操作人 / 说明"></label>
+    <label class="filter-field"><span>操作人</span><select name="operator" class="form-select"><option value="">全部</option>{% for user in operators %}<option value="{{ user.pk }}" {% if filters.operator == user.pk|stringformat:'s' %}selected{% endif %}>{{ user.profile.display_name|default:user.username }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>动作</span><select name="action" class="form-select"><option value="">全部</option>{% for value,label in actions %}<option value="{{ value }}" {% if filters.action == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>单据类型</span><select name="order_type" class="form-select"><option value="">全部</option>{% for value,label in order_types %}<option value="{{ value }}" {% if filters.order_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>开始日期</span><input type="date" name="date_from" value="{{ filters.date_from }}" class="form-input"></label>
+    <label class="filter-field"><span>结束日期</span><input type="date" name="date_to" value="{{ filters.date_to }}" class="form-input"></label>
+    <div class="filter-actions"><button class="btn btn-primary">查询</button><a href="{% url 'operation_logs' %}" class="btn btn-ghost">重置</a></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head list-head"><div><h2>审计轨迹</h2><p>共 {{ page_obj.paginator.count }} 条{% if filters.has_filters %}（已筛选）{% endif %}</p></div></div>
+  {% if logs %}
+  <div class="table-wrap"><table class="data-table order-table"><thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>单据</th><th>状态变化</th><th>说明</th></tr></thead><tbody>
+    {% for log in logs %}
+    <tr>
+      <td class="nowrap">{{ log.created_at|date:"Y-m-d" }}<small class="cell-sub">{{ log.created_at|date:"H:i:s" }}</small></td>
+      <td><strong>{{ log.operator.profile.display_name|default:log.operator.username|default:"系统" }}</strong><small class="cell-sub">{{ log.operator.profile.get_role_display|default:"系统" }}</small></td>
+      <td><span class="log-action action-{{ log.action }}">{{ log.get_action_display }}</span></td>
+      <td><span class="type-tag">{{ log.get_order_type_display }}</span>{% if log.order_type == 'inbound' %}<a class="order-link" href="{% url 'inbound_detail' log.order_id %}">{{ log.order_no }}</a>{% elif log.order_type == 'transfer' %}<a class="order-link" href="{% url 'transfer_detail' log.order_id %}">{{ log.order_no }}</a>{% else %}<a class="order-link" href="{% url 'outbound_detail' log.order_id %}">{{ log.order_no }}</a>{% endif %}</td>
+      <td>{% if log.from_status != log.to_status %}<span class="status status-sm status-{% if log.to_status == 'pending' %}warning{% elif log.to_status == 'approved' %}info{% elif log.to_status == 'completed' %}success{% elif log.to_status == 'rejected' %}danger{% elif log.to_status == 'cancelled' %}muted{% else %}neutral{% endif %}">{{ log.from_status_label }} → {{ log.to_status_label }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="log-comment">{{ log.comment|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody></table></div>
+  {% if page_obj.paginator.num_pages > 1 %}<nav class="pagination"><span class="page-info">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span><div class="page-buttons">{% if page_obj.has_previous %}<a class="page-btn" href="?{% query_replace page=page_obj.previous_page_number %}">上一页</a>{% endif %}{% for num in page_obj.paginator.page_range %}{% if num == page_obj.number %}<span class="page-btn active">{{ num }}</span>{% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}<a class="page-btn" href="?{% query_replace page=num %}">{{ num }}</a>{% endif %}{% endfor %}{% if page_obj.has_next %}<a class="page-btn" href="?{% query_replace page=page_obj.next_page_number %}">下一页</a>{% endif %}</div></nav>{% endif %}
+  {% else %}<div class="empty-inline">没有符合条件的操作日志。</div>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>注册 · 本草仓</title>
+  <link rel="stylesheet" href="{% static 'warehouse/css/app.css' %}?v=20261030">
+</head>
+<body class="login-body">
+<div class="login-shell">
+  <section class="login-visual">
+    <div class="login-brand">
+      <span class="brand-seal brand-seal-lg">本</span>
+      <span><strong>本草仓</strong><small>TCM WAREHOUSE</small></span>
+    </div>
+    <div class="login-quote">
+      <p class="eyebrow">中药仓储库位管理系统</p>
+      <h1>加入本草仓，<br>从一味药开始。</h1>
+      <p class="login-desc">注册账号默认为只读访客。管理员分配岗位后，即可参与入库、移库、出库或审核工作。</p>
+    </div>
+    <div class="login-flow"><span>注册</span><i></i><span>分配岗位</span><i></i><span>进入业务</span></div>
+    <div class="login-foot">学生 1 · 用户注册 / 登录 / 权限</div>
+  </section>
+  <section class="login-panel">
+    <div class="login-form-wrap">
+      <p class="eyebrow">创建账号</p>
+      <h2>注册本草仓用户</h2>
+      <p class="muted">注册后请联系管理员在“用户管理”中分配仓管员/主管岗位。</p>
+      {% if form.non_field_errors %}<div class="form-alert">{{ form.non_field_errors|join:"；" }}</div>{% endif %}
+      <form method="post" class="login-form" novalidate>
+        {% csrf_token %}
+        {% for field in form %}
+        <label class="field">
+          <span class="field-label">{{ field.label }}{% if field.field.required %} <em>*</em>{% endif %}</span>
+          {{ field }}
+          {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+        </label>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary btn-block">完成注册 <span>→</span></button>
+      </form>
+      <p class="login-tip">已有账号？<a href="{% url 'login' %}">返回登录</a></p>
+    </div>
+  </section>
+</div>
+<script src="{% static 'warehouse/js/app.js' %}?v=20261030"></script>
+</body>
+</html>

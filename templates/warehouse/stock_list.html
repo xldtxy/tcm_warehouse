@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}库存批次{% endblock %}
+{% block breadcrumb %}基础资料 / 库存批次{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 2 · 药材与库存</p>
+    <h1>库存批次</h1>
+    <p class="page-sub">库存按“药材 + 库位 + 批次”记录。数量变化只能通过入库、移库、出库或盘点调整产生，并保留流水。</p>
+  </div>
+  {% if can_manage %}<a href="{% url 'stock_create' %}" class="btn btn-primary">＋ 新增库存批次</a>{% endif %}
+</section>
+
+<section class="stat-grid compact-stats">
+  <article class="stat-card"><div class="stat-top"><span>批次总数</span><span class="stat-icon blue">批</span></div><strong class="stat-value">{{ page_obj.paginator.count }}<small> 批</small></strong><p class="stat-note">当前筛选范围</p></article>
+  <article class="stat-card"><div class="stat-top"><span>库存合计</span><span class="stat-icon green">存</span></div><strong class="stat-value">{{ total_stock|qty }}<small> kg</small></strong><p class="stat-note">当前筛选范围（同一单位）</p></article>
+  <article class="stat-card"><div class="stat-top"><span>低于安全库存</span><span class="stat-icon amber">低</span></div><strong class="stat-value">{% if filters.low %}已筛选{% else %}关注{% endif %}</strong><p class="stat-note">使用左侧低库存筛选</p></article>
+</section>
+
+<section class="panel filter-panel">
+  <form method="get" class="filter-form">
+    <label class="filter-field filter-search"><span>关键字</span><input type="search" name="q" value="{{ filters.q }}" class="form-input" placeholder="药材 / 批次 / 库位"></label>
+    <label class="filter-field"><span>仓库</span><select name="warehouse" class="form-select"><option value="">全部仓库</option>{% for warehouse in warehouses %}<option value="{{ warehouse.pk }}" {% if filters.warehouse == warehouse.pk|stringformat:'s' %}selected{% endif %}>{{ warehouse.name }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>药材</span><select name="herb" class="form-select"><option value="">全部药材</option>{% for herb in herbs %}<option value="{{ herb.pk }}" {% if filters.herb == herb.pk|stringformat:'s' %}selected{% endif %}>{{ herb.name }}</option>{% endfor %}</select></label>
+    <label class="check-row filter-check"><input type="checkbox" name="low" value="1" {% if filters.low %}checked{% endif %}> <span>只看低库存</span></label>
+    <div class="filter-actions"><button class="btn btn-primary">筛选</button><a href="{% url 'stock_list' %}" class="btn btn-ghost">重置</a></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head list-head"><div><h2>库存明细</h2><p>共 {{ page_obj.paginator.count }} 个批次</p></div></div>
+  {% if batches %}
+  <div class="table-wrap"><table class="data-table order-table"><thead><tr><th>药材</th><th>库位</th><th>批次号</th><th class="num">库存</th><th class="num">安全库存</th><th>状态</th><th>有效期</th><th></th></tr></thead><tbody>
+    {% for batch in batches %}
+    <tr>
+      <td><strong>{{ batch.herb.name }}</strong><small class="cell-sub">{{ batch.herb.code }}</small></td>
+      <td><span class="loc-chip">{{ batch.location.code }}</span><small class="cell-sub">{{ batch.location.warehouse.name }}</small></td>
+      <td><span class="code">{{ batch.batch_no }}</span></td>
+      <td class="num"><strong>{{ batch.quantity|qty }}</strong> <small>{{ batch.herb.unit }}</small></td>
+      <td class="num">{{ batch.herb.safety_stock|qty }}</td>
+      <td>{% if batch.is_low_stock %}<span class="status status-warning">低库存</span>{% else %}<span class="status status-success">正常</span>{% endif %}</td>
+      <td>{{ batch.expiry_date|date:"Y-m-d"|default:"—" }}</td>
+      <td class="row-action"><a href="{% url 'stock_detail' batch.pk %}" class="btn btn-tiny">详情</a>{% if can_manage %}<a href="{% url 'stock_edit' batch.pk %}" class="btn btn-tiny">编辑</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty-inline">没有符合条件的库存批次。</div>{% endif %}
+</section>
+{% endblock %}

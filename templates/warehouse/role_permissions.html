@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}角色权限{% endblock %}
+{% block breadcrumb %}系统管理 / 角色与权限{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 1 · 权限配置</p>
+    <h1>角色、菜单与接口权限</h1>
+    <p class="page-sub">菜单决定侧边栏入口，接口权限决定页面内动作能否执行。菜单与查看接口会自动保持一致，避免出现“能看见但打不开”的入口。</p>
+  </div>
+</section>
+
+<div class="role-tabs">
+  {% for value,label in role_choices %}
+  <a href="?role={{ value }}" class="role-tab {% if selected_role == value %}active{% endif %}">
+    <span>{{ label }}</span>
+    <em>{{ role_stats|get_item:value|default:0 }} 人</em>
+  </a>
+  {% endfor %}
+</div>
+
+{% if is_superuser_role %}
+<div class="notice notice-muted">
+  <strong>系统管理员固定拥有全部权限</strong>
+  <p>超级管理员的权限始终视为全部开启，避免误配置导致系统无法管理；其他角色可在此配置。</p>
+</div>
+<div class="panel role-readonly">
+  <div class="panel-head"><div><h2>{{ selected_role_label }} · 权限范围</h2><p>只读展示</p></div></div>
+  <div class="permission-summary">
+    <span>全部菜单</span><span>全部接口</span><span>用户与角色管理</span><span>数据导出与打印</span>
+  </div>
+</div>
+{% else %}
+<form method="post" class="role-config-form">
+  {% csrf_token %}
+  <input type="hidden" name="role" value="{{ selected_role }}">
+  <div class="role-grid">
+    <section class="panel">
+      <div class="panel-head"><div><h2>可见菜单</h2><p>{{ selected_role_label }} 登录后侧边栏显示哪些入口</p></div></div>
+      <div class="check-groups">
+        {% for group in menu_groups %}
+        <div class="check-group">
+          <h3>{{ group.label }}</h3>
+          <div class="check-list">
+            {% for key,label in group.items %}
+            <label class="check-row"><input type="checkbox" name="menus" value="{{ key }}" {% if key in selected_menus %}checked{% endif %}> <span>{{ label }}</span><code>{{ key }}</code></label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>接口 / 操作权限</h2><p>控制创建、审核、执行、导入导出等动作</p></div></div>
+      <div class="check-groups">
+        {% for group in permission_groups %}
+        <div class="check-group">
+          <h3>{{ group.label }}</h3>
+          <div class="check-list">
+            {% for code,label in group.items %}
+            <label class="check-row"><input type="checkbox" name="perm_{{ code }}" {% if selected_perms|get_item:code %}checked{% endif %}> <span>{{ label }}</span><code>{{ code }}</code></label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+  <div class="panel form-actions role-save-bar">
+    <div>
+      <strong>正在编辑：{{ selected_role_label }}</strong>
+      <small class="cell-sub">{% if updated_at %}上次修改 {{ updated_at|date:"Y-m-d H:i" }}{% if updated_by %} · {{ updated_by.profile.display_name }}{% endif %}{% else %}尚未保存过，当前展示默认权限{% endif %}</small>
+    </div>
+    <button type="submit" class="btn btn-primary">保存 {{ selected_role_label }} 权限</button>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}工作台{% endblock %}
+{% block breadcrumb %}工作台{% endblock %}
+{% block content %}
+<section class="page-head dashboard-head">
+  <div>
+    <p class="eyebrow">中药仓储 · 学生 1-5 全流程</p>
+    <h1>你好，{{ profile.display_name }}</h1>
+    <p class="page-sub">今天有 <strong>{{ pending_total }}</strong> 张单据待处理，<strong>{{ approved_total }}</strong> 张待执行。当前管理 <strong>{{ herb_count }}</strong> 味药材、<strong>{{ batch_count }}</strong> 个库存批次。</p>
+  </div>
+  <div class="head-actions">
+    {% if role_permissions|get_item:'inbound.create' %}<a href="{% url 'inbound_create' %}" class="btn btn-primary">＋ 新建入库单</a>{% endif %}
+    {% if role_permissions|get_item:'transfer.create' %}<a href="{% url 'transfer_create' %}" class="btn btn-ghost">新建移库单</a>{% endif %}
+    {% if role_permissions|get_item:'outbound.create' %}<a href="{% url 'outbound_create' %}" class="btn btn-ghost">新建出库单</a>{% endif %}
+    {% if not can_any_create %}<a href="{% url 'stock_query' %}" class="btn btn-primary">查看库存查询</a>{% endif %}
+  </div>
+</section>
+
+<section class="hero-panel">
+  <div class="hero-copy">
+    <span class="hero-kicker">一物一位 · 一单一痕</span>
+    <h2>入库有验，移出有据</h2>
+    <p>从供应商到货、主管验收、库存入账，到移库、出库与盘点调整，所有数量变化都落到批次和流水上。全流程可查询、可审核、可导出。</p>
+    <div class="hero-actions">
+      <a href="{% url 'inbound_list' %}?status=pending" class="btn btn-light">待验收 {{ nav_pending_inbounds }}</a>
+      <a href="{% url 'transfer_list' %}?status=pending" class="btn btn-line-light">移库待审 {{ nav_pending_transfers }}</a>
+      <a href="{% url 'outbound_list' %}?status=approved" class="btn btn-line-light">待执行 {{ approved_total }}</a>
+    </div>
+  </div>
+  <div class="hero-flow" aria-label="业务流程">
+    <div class="flow-step"><em>01</em><strong>入库验收</strong><small>供应商 / 批次 / 库位</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><em>02</em><strong>库存管理</strong><small>药材 / 批次 / 安全库存</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><em>03</em><strong>移库出库</strong><small>申请 / 审核 / 执行</small></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><em>04</em><strong>查询留痕</strong><small>统计 / 日志 / 导出</small></div>
+  </div>
+</section>
+
+<section class="stat-grid">
+  <article class="stat-card">
+    <div class="stat-top"><span>待处理单据</span><span class="stat-icon amber">待</span></div>
+    <strong class="stat-value">{{ pending_total }}<small> 单</small></strong>
+    <p class="stat-note {% if pending_total %}is-warn{% endif %}">含待验收 {{ nav_pending_inbounds }} · 待审核 {{ nav_pending_transfers|add:nav_pending_outbounds }}</p>
+  </article>
+  <article class="stat-card">
+    <div class="stat-top"><span>待执行</span><span class="stat-icon blue">行</span></div>
+    <strong class="stat-value">{{ approved_total }}<small> 单</small></strong>
+    <p class="stat-note">验收通过 / 审核通过，等待仓管确认</p>
+  </article>
+  <article class="stat-card">
+    <div class="stat-top"><span>今日完成</span><span class="stat-icon green">完</span></div>
+    <strong class="stat-value">{{ completed_today }}<small> 单</small></strong>
+    <p class="stat-note">入库 + 移库 + 出库合计</p>
+  </article>
+  <article class="stat-card">
+    <div class="stat-top"><span>库存批次</span><span class="stat-icon red">库</span></div>
+    <strong class="stat-value">{{ batch_count }}<small> 批</small></strong>
+    <p class="stat-note">{{ stock_total|qty }} kg · 异常留档 {{ exception_total }}</p>
+  </article>
+</section>
+
+<section class="module-grid">
+  {% if 'herbs' in allowed_menus or 'stock' in allowed_menus %}
+  <a class="module-card" href="{% url 'herb_list' %}">
+    <span class="module-icon green">药</span>
+    <div><strong>药材与库存</strong><small>{{ herb_count }} 味药材 · {{ batch_count }} 个批次</small></div>
+    <em>学生 2 →</em>
+  </a>
+  {% endif %}
+  {% if 'inbound' in allowed_menus %}
+  <a class="module-card" href="{% url 'inbound_list' %}">
+    <span class="module-icon amber">入</span>
+    <div><strong>入库管理</strong><small>待验收 {{ nav_pending_inbounds }} · 多明细入库</small></div>
+    <em>学生 3 →</em>
+  </a>
+  {% endif %}
+  {% if 'transfer' in allowed_menus or 'outbound' in allowed_menus %}
+  <a class="module-card" href="{% url 'transfer_list' %}">
+    <span class="module-icon blue">移</span>
+    <div><strong>移库 / 出库</strong><small>待审 {{ nav_pending_transfers|add:nav_pending_outbounds }} · 待执行 {{ approved_total }}</small></div>
+    <em>学生 4 →</em>
+  </a>
+  {% endif %}
+  {% if 'query' in allowed_menus or 'logs' in allowed_menus %}
+  <a class="module-card" href="{% url 'stock_query' %}">
+    <span class="module-icon red">查</span>
+    <div><strong>查询与审计</strong><small>库存流水 · 统计图表 · 操作日志</small></div>
+    <em>学生 5 →</em>
+  </a>
+  {% endif %}
+</section>
+
+<div class="dashboard-grid">
+  <section class="panel">
+    <div class="panel-head">
+      <div><h2>最近业务单据</h2><p>入库、移库与出库的最新记录</p></div>
+      <div class="panel-tools">
+        <a href="{% url 'inbound_list' %}" class="text-link">入库</a>
+        <a href="{% url 'transfer_list' %}" class="text-link">移库</a>
+        <a href="{% url 'outbound_list' %}" class="text-link">出库</a>
+      </div>
+    </div>
+    {% if recent_orders %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>单据</th><th>类型</th><th>对象 / 明细</th><th>路径</th><th class="num">数量</th><th>状态</th><th>操作人</th></tr></thead>
+        <tbody>
+          {% for item in recent_orders %}
+          <tr>
+            <td>
+              {% if item.kind == 'inbound' %}<a class="order-link" href="{% url 'inbound_detail' item.order.pk %}">{{ item.order.inbound_no }}</a>
+              {% elif item.kind == 'transfer' %}<a class="order-link" href="{% url 'transfer_detail' item.order.pk %}">{{ item.order.transfer_no }}</a>
+              {% else %}<a class="order-link" href="{% url 'outbound_detail' item.order.pk %}">{{ item.order.outbound_no }}</a>{% endif %}
+              <small class="cell-sub">{{ item.order.created_at|date:"m-d H:i" }}</small>
+            </td>
+            <td><span class="type-tag">{{ item.kind_label }}</span></td>
+            <td>{% if item.kind == 'inbound' %}{{ item.order.supplier.name }}<small class="cell-sub">{{ item.order.items.count }} 条明细</small>{% else %}{{ item.order.herb.name }}<small class="cell-sub">{{ item.order.batch_no }}</small>{% endif %}</td>
+            <td class="path-cell">
+              {% if item.kind == 'inbound' %}{{ item.order.supplier.name }} <span class="path-arrow">→</span> {{ item.order.warehouse.name }}
+              {% elif item.kind == 'transfer' %}{{ item.order.from_location.code }} <span class="path-arrow">→</span> {{ item.order.to_location.code }}
+              {% else %}{{ item.order.location.code }} <span class="path-arrow">→</span> 出库{% endif %}
+            </td>
+            <td class="num">{% if item.kind == 'inbound' %}{{ item.order.total_quantity|qty }}<small> kg</small>{% else %}{{ item.order.quantity|qty }} <small>{{ item.order.herb.unit }}</small>{% endif %}</td>
+            <td><span class="status status-{{ item.order.status_tone }}">{% if item.kind == 'inbound' %}{{ item.order.status_label }}{% else %}{{ item.order.get_status_display }}{% endif %}</span></td>
+            <td>{{ item.order.applicant.profile.display_name|default:item.order.applicant.username }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<div class="empty-inline">还没有业务单据。</div>{% endif %}
+  </section>
+
+  <aside class="side-stack">
+    <section class="panel chart-panel">
+      <div class="panel-head"><div><h2>近 7 日完成</h2><p>入库 + 移库 + 出库</p></div><span class="chart-total">{{ completed_today }} <small>今日</small></span></div>
+      <div class="bar-chart" role="img" aria-label="近七日完成单据柱状图">
+        {% for bar in daily %}<div class="bar-col" title="{{ bar.date|date:'Y-m-d' }}：{{ bar.count }} 单"><span class="bar-count">{{ bar.count }}</span><div class="bar-track"><i style="height: {{ bar.height }}%"></i></div><span class="bar-label">{{ bar.label }}</span></div>{% endfor %}
+      </div>
+    </section>
+
+    <section class="panel stock-panel">
+      <div class="panel-head"><div><h2>库存提醒</h2><p>低于安全库存的批次</p></div><span class="stock-total">{{ stock_total|qty }} <small>kg</small></span></div>
+      {% if low_stock %}
+      <ul class="stock-list">{% for batch in low_stock %}<li><div><strong>{{ batch.herb.name }}</strong><small>{{ batch.location.code }} · {{ batch.batch_no }}</small></div><span class="stock-qty">{{ batch.quantity|qty }}<small>{{ batch.herb.unit }}</small></span></li>{% endfor %}</ul>
+      {% else %}<div class="empty-inline compact">当前没有低于安全库存的批次。</div>{% endif %}
+    </section>
+  </aside>
+</div>
+
+<section class="panel activity-panel">
+  <div class="panel-head"><div><h2>操作动态</h2><p>跨单据的统一审计轨迹</p></div><a href="{% url 'operation_logs' %}" class="text-link">全部日志 →</a></div>
+  {% if logs %}
+  <ol class="timeline timeline-compact">
+    {% for log in logs %}
+    <li>
+      <span class="timeline-dot dot-{{ log.action }}"></span>
+      <div class="timeline-body">
+        <p><strong>{{ log.operator.profile.display_name|default:log.operator.username|default:"系统" }}</strong> {{ log.get_action_display }} <span class="type-tag">{{ log.get_order_type_display }}</span>
+          {% if log.order_type == 'inbound' %}<a href="{% url 'inbound_detail' log.order_id %}" class="order-link">{{ log.order_no }}</a>
+          {% elif log.order_type == 'transfer' %}<a href="{% url 'transfer_detail' log.order_id %}" class="order-link">{{ log.order_no }}</a>
+          {% else %}<a href="{% url 'outbound_detail' log.order_id %}" class="order-link">{{ log.order_no }}</a>{% endif %}
+        </p>
+        {% if log.comment %}<small>{{ log.comment }}</small>{% endif %}
+      </div>
+      <time>{{ log.created_at|date:"m-d H:i" }}</time>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}<div class="empty-inline compact">暂无操作记录。</div>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}用户管理{% endblock %}
+{% block breadcrumb %}系统管理 / 用户管理{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 1 · 账号与岗位</p>
+    <h1>用户管理</h1>
+    <p class="page-sub">注册用户默认为只读访客。管理员在这里分配仓管员、主管或管理员岗位，并控制账号启用状态。</p>
+  </div>
+  <a href="{% url 'user_create' %}" class="btn btn-primary">＋ 新建用户</a>
+</section>
+
+<section class="panel filter-panel">
+  <form method="get" class="filter-form">
+    <label class="filter-field filter-search"><span>关键字</span><input type="search" name="q" value="{{ filters.q }}" class="form-input" placeholder="账号 / 姓名 / 邮箱 / 电话"></label>
+    <label class="filter-field"><span>岗位</span><select name="role" class="form-select"><option value="">全部岗位</option>{% for value,label in role_choices %}<option value="{{ value }}" {% if filters.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>状态</span><select name="active" class="form-select"><option value="">全部状态</option><option value="1" {% if filters.active == '1' %}selected{% endif %}>启用</option><option value="0" {% if filters.active == '0' %}selected{% endif %}>停用</option></select></label>
+    <div class="filter-actions"><button class="btn btn-primary" type="submit">筛选</button><a href="{% url 'user_list' %}" class="btn btn-ghost">重置</a></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head list-head"><div><h2>账号列表</h2><p>共 {{ page_obj.paginator.count }} 个账号</p></div>
+    <div class="role-mini-stats">{% for value,label in role_choices %}<span>{{ label }} <b>{{ role_counts|get_item:value|default:0 }}</b></span>{% endfor %}</div>
+  </div>
+  {% if users %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>用户</th><th>岗位</th><th>部门</th><th>电话</th><th>状态</th><th>最近登录</th><th></th></tr></thead>
+      <tbody>
+        {% for item in users %}
+        <tr>
+          <td><strong>{{ item.profile.display_name }}</strong><small class="cell-sub">{{ item.username }}{% if item.email %} · {{ item.email }}{% endif %}</small></td>
+          <td><span class="type-tag">{{ item.profile.get_role_display }}</span></td>
+          <td>{{ item.profile.department|default:"—" }}</td>
+          <td>{{ item.profile.phone|default:"—" }}</td>
+          <td>{% if item.is_active %}<span class="status status-success">启用</span>{% else %}<span class="status status-muted">停用</span>{% endif %}</td>
+          <td>{{ item.last_login|date:"Y-m-d H:i"|default:"从未登录" }}</td>
+          <td class="row-action"><a href="{% url 'user_edit' item.pk %}" class="btn btn-tiny">编辑</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="empty-inline">没有符合条件的用户。</div>{% endif %}
+</section>
+{% endblock %}

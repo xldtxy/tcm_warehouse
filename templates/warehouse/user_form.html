@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block breadcrumb %}系统管理 / 用户管理 / {{ title }}{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <a class="back-link" href="{% url 'user_list' %}">← 返回用户管理</a>
+    <h1>{{ title }}</h1>
+    <p class="page-sub">{% if is_create %}创建登录账号并指定初始岗位。{% else %}修改岗位、联系方式或重置密码。{% endif %}</p>
+  </div>
+</section>
+<form method="post" class="panel form-card narrow-form">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="form-alert">{{ form.non_field_errors|join:"；" }}</div>{% endif %}
+  <div class="form-grid">
+    {% for field in form %}
+    <div class="field {% if field.errors %}has-error{% endif %} {% if field.name == 'is_active' %}field-check{% endif %}">
+      <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <em>*</em>{% endif %}</label>
+      {% if field.name == 'is_active' %}<label class="check-row">{{ field }} <span>允许该账号登录系统</span></label>{% else %}{{ field }}{% endif %}
+      {% if field.help_text %}<p class="field-help">{{ field.help_text }}</p>{% endif %}
+      {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% if edit_user and edit_user.is_superuser %}
+  <div class="form-alert form-alert-info">当前账号是超级管理员：岗位始终视为系统管理员，不会被这里的配置降低权限。</div>
+  {% endif %}
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">保存用户</button>
+    <a href="{% url 'user_list' %}" class="btn btn-ghost">取消</a>
+  </div>
+</form>
+{% endblock %}

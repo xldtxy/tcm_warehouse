@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}{% if is_create %}新建入库单{% else %}编辑入库单{% endif %}{% endblock %}
+{% block breadcrumb %}入库管理 / {% if is_create %}新建{% else %}编辑{% endif %}{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <a class="back-link" href="{% if is_create %}{% url 'inbound_list' %}{% else %}{% url 'inbound_detail' order.pk %}{% endif %}">← 返回入库管理</a>
+    <h1>{% if is_create %}新建入库单{% else %}编辑入库单{% endif %}</h1>
+    <p class="page-sub">一张入库单可以包含多条药材批次明细。仓管建单 → 主管验收 → 仓管确认入库，库存才会增加。</p>
+  </div>
+  {% if order %}<span class="status status-lg status-{{ order.status_tone }}">{{ order.status_label }}</span>{% endif %}
+</section>
+
+<form method="post" id="inbound-form" class="inbound-form">
+  {% csrf_token %}
+  <section class="panel form-card">
+    <div class="panel-head"><div><h2>到货信息</h2><p>供应来源与入库仓库</p></div><span class="step-chip">第 1 步 / 共 2 步</span></div>
+    {% if form.non_field_errors %}<div class="form-alert">{{ form.non_field_errors|join:"；" }}</div>{% endif %}
+    <div class="form-grid">
+      {% for field in form %}
+      <div class="field {% if field.errors %}has-error{% endif %} {% if field.name == 'remark' %}field-full{% endif %}">
+        <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <em>*</em>{% endif %}</label>
+        {{ field }}
+        {% for error in field.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel form-card formset-card">
+    <div class="panel-head"><div><h2>入库明细</h2><p>每条明细对应一个药材在目标库位的一个批次</p></div><button type="button" class="btn btn-ghost btn-sm" id="add-item-row">＋ 添加明细</button></div>
+    {{ formset.management_form }}
+    {% if formset.non_form_errors %}<div class="form-alert">{{ formset.non_form_errors|join:"；" }}</div>{% endif %}
+    <div class="table-wrap">
+      <table class="data-table formset-table">
+        <thead><tr><th>药材 *</th><th>批次号 *</th><th>入库库位 *</th><th>数量 *</th><th>单价</th><th>生产日期</th><th>有效期</th><th>备注</th><th></th></tr></thead>
+        <tbody id="formset-body">
+          {% for item_form in formset %}
+          <tr class="formset-row">
+            <td>{{ item_form.id }}{{ item_form.herb }}{% for e in item_form.herb.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</td>
+            <td>{{ item_form.batch_no }}{% for e in item_form.batch_no.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</td>
+            <td>{{ item_form.location }}{% for e in item_form.location.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</td>
+            <td>{{ item_form.quantity }}{% for e in item_form.quantity.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</td>
+            <td>{{ item_form.unit_price }}{% for e in item_form.unit_price.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</td>
+            <td>{{ item_form.production_date }}{% for e in item_form.production_date.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</td>
+            <td>{{ item_form.expiry_date }}{% for e in item_form.expiry_date.errors %}<small class="field-error">{{ e }}</small>{% endfor %}</td>
+            <td>{{ item_form.remark }}</td>
+            <td class="formset-delete"><label class="delete-check" title="删除此行">{{ item_form.DELETE }}<span>删</span></label></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="side-footnote">提交验收前会校验：至少一条明细、数量大于 0、库位必须属于所选仓库、同一药材/批次/库位不能重复。</p>
+  </section>
+
+  <div class="panel form-actions bottom-actions">
+    <a href="{% if is_create %}{% url 'inbound_list' %}{% else %}{% url 'inbound_detail' order.pk %}{% endif %}" class="btn btn-ghost">取消</a>
+    <button type="submit" name="action" value="draft" class="btn btn-ghost">保存草稿</button>
+    <button type="submit" name="action" value="submit" class="btn btn-primary">保存并提交验收 →</button>
+  </div>
+</form>
+
+<template id="empty-form-template">
+  <tr class="formset-row">
+    <td>{{ formset.empty_form.id }}{{ formset.empty_form.herb }}</td>
+    <td>{{ formset.empty_form.batch_no }}</td>
+    <td>{{ formset.empty_form.location }}</td>
+    <td>{{ formset.empty_form.quantity }}</td>
+    <td>{{ formset.empty_form.unit_price }}</td>
+    <td>{{ formset.empty_form.production_date }}</td>
+    <td>{{ formset.empty_form.expiry_date }}</td>
+    <td>{{ formset.empty_form.remark }}</td>
+    <td class="formset-delete"><button type="button" class="icon-btn danger remove-row" title="移除此行">×</button></td>
+  </tr>
+</template>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const body = document.getElementById("formset-body");
+  const totalForms = document.getElementById("id_{{ formset.prefix }}-TOTAL_FORMS");
+  const add = document.getElementById("add-item-row");
+  const template = document.getElementById("empty-form-template");
+  if (!body || !totalForms || !add || !template) return;
+
+  function bindRemove(row) {
+    const btn = row.querySelector(".remove-row");
+    if (btn) {
+      btn.addEventListener("click", () => row.remove());
+    }
+    const del = row.querySelector('input[name$="-DELETE"]');
+    if (del) {
+      del.addEventListener("change", () => row.classList.toggle("row-deleted", del.checked));
+    }
+  }
+  body.querySelectorAll(".formset-row").forEach(bindRemove);
+
+  add.addEventListener("click", () => {
+    const index = Number(totalForms.value);
+    const html = template.innerHTML.replace(/__prefix__/g, index);
+    const wrapper = document.createElement("tbody");
+    wrapper.innerHTML = html.trim();
+    const row = wrapper.querySelector("tr");
+    body.appendChild(row);
+    totalForms.value = index + 1;
+    bindRemove(row);
+    const firstSelect = row.querySelector("select");
+    if (firstSelect) firstSelect.focus();
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}{% if kind == 'transfer' %}{{ order.transfer_no }}{% else %}{{ order.outbound_no }}{% endif %}{% endblock %}
+{% block breadcrumb %}{% if kind == 'transfer' %}移库管理{% else %}出库管理{% endif %} / 单据详情{% endblock %}
+{% block content %}
+{% if kind == 'transfer' %}{% url 'transfer_edit' order.pk as edit_url %}{% url 'transfer_submit' order.pk as submit_url %}{% url 'transfer_approve' order.pk as approve_url %}{% url 'transfer_reject' order.pk as reject_url %}{% url 'transfer_complete' order.pk as complete_url %}{% url 'transfer_cancel' order.pk as cancel_url %}{% url 'transfer_exception' order.pk as exception_url %}{% url 'transfer_attachment_upload' order.pk as attachment_url %}{% else %}{% url 'outbound_edit' order.pk as edit_url %}{% url 'outbound_submit' order.pk as submit_url %}{% url 'outbound_approve' order.pk as approve_url %}{% url 'outbound_reject' order.pk as reject_url %}{% url 'outbound_complete' order.pk as complete_url %}{% url 'outbound_cancel' order.pk as cancel_url %}{% url 'outbound_exception' order.pk as exception_url %}{% url 'outbound_attachment_upload' order.pk as attachment_url %}{% endif %}
+
+<section class="page-head detail-head">
+  <div>
+    <a class="back-link" href="{% if kind == 'transfer' %}{% url 'transfer_list' %}{% else %}{% url 'outbound_list' %}{% endif %}">← 返回{% if kind == 'transfer' %}移库管理{% else %}出库管理{% endif %}</a>
+    <div class="detail-title-row">
+      <h1>{% if kind == 'transfer' %}{{ order.transfer_no }}{% else %}{{ order.outbound_no }}{% endif %}</h1>
+      <span class="status status-lg status-{{ order.status_tone }}">{{ order.get_status_display }}</span>
+      {% if order.exception_note %}<span class="mini-flag">有异常备注</span>{% endif %}
+    </div>
+    <p class="page-sub">
+      {{ kind_label }} · {{ order.herb.name }} {{ order.quantity|qty }}{{ order.herb.unit }} ·
+      申请人 {{ order.applicant.profile.display_name|default:order.applicant.username }} ·
+      {{ order.created_at|date:"Y-m-d H:i" }}
+    </p>
+  </div>
+  <div class="head-actions">
+    {% if can_edit %}<a href="{{ edit_url }}" class="btn btn-ghost">编辑单据</a>{% endif %}
+    {% if can_submit %}
+    <form method="post" action="{{ submit_url }}" class="inline-form">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">提交审核 →</button>
+    </form>
+    {% endif %}
+    {% if can_complete %}
+    <button type="button" class="btn btn-primary" data-dialog-open="complete-dialog">确认{% if kind == 'transfer' %}移库{% else %}出库{% endif %}完成</button>
+    {% endif %}
+  </div>
+</section>
+
+{% if order.status == 'rejected' and order.review_comment %}
+<div class="notice notice-danger">
+  <strong>审核未通过</strong>
+  <p>{{ order.review_comment }}</p>
+  {% if can_edit %}<span>可点击“编辑单据”修改后重新提交。</span>{% endif %}
+</div>
+{% elif order.status == 'cancelled' %}
+<div class="notice notice-muted">
+  <strong>单据已取消</strong>
+  <p>本单不会再影响库存。操作轨迹与历史备注仍保留在下方。</p>
+</div>
+{% endif %}
+
+<section class="flow-panel">
+  <div class="flow-track">
+    <div class="flow-node {% if order.status == 'draft' %}current{% elif order.status == 'rejected' %}error{% else %}done{% endif %}">
+      <span class="node-num">{% if order.status == 'draft' or order.status == 'rejected' %}1{% else %}✓{% endif %}</span>
+      <div><strong>草稿建单</strong><small>{{ order.created_at|date:"m-d H:i" }}</small></div>
+    </div>
+    <i class="flow-line {% if order.status == 'pending' or order.status == 'approved' or order.status == 'completed' %}filled{% endif %}"></i>
+    <div class="flow-node {% if order.status == 'pending' %}current{% elif order.status == 'rejected' %}error{% elif order.status == 'approved' or order.status == 'completed' %}done{% endif %}">
+      <span class="node-num">{% if order.status == 'approved' or order.status == 'completed' %}✓{% else %}2{% endif %}</span>
+      <div><strong>主管审核</strong><small>{% if order.audited_at %}{{ order.audited_at|date:"m-d H:i" }}{% else %}待处理{% endif %}</small></div>
+    </div>
+    <i class="flow-line {% if order.status == 'approved' or order.status == 'completed' %}filled{% endif %}"></i>
+    <div class="flow-node {% if order.status == 'approved' %}current{% elif order.status == 'completed' %}done{% endif %}">
+      <span class="node-num">{% if order.status == 'completed' %}✓{% else %}3{% endif %}</span>
+      <div><strong>库存执行</strong><small>{% if order.completed_at %}{{ order.completed_at|date:"m-d H:i" }}{% else %}等待确认{% endif %}</small></div>
+    </div>
+    <i class="flow-line {% if order.status == 'completed' %}filled{% endif %}"></i>
+    <div class="flow-node {% if order.status == 'completed' %}done{% endif %}">
+      <span class="node-num">{% if order.status == 'completed' %}✓{% else %}4{% endif %}</span>
+      <div><strong>完成留痕</strong><small>{% if order.completed_at %}已归档{% else %}待完成{% endif %}</small></div>
+    </div>
+  </div>
+  {% if order.status == 'cancelled' %}
+  <p class="flow-cancelled">该单据在“{% if order.audited_at %}已审核{% else %}待处理{% endif %}”阶段被取消，未产生库存变更。</p>
+  {% endif %}
+</section>
+
+<div class="detail-layout">
+  <div class="detail-main">
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>业务信息</h2><p>{% if kind == 'transfer' %}库位移动明细{% else %}出库明细与去向{% endif %}</p></div>
+        <span class="type-tag">{% if kind == 'transfer' %}移库单{% else %}{{ order.get_outbound_type_display }}{% endif %}</span>
+      </div>
+
+      <div class="route-box">
+        <div class="route-point">
+          <span class="route-kicker">{% if kind == 'transfer' %}移出库位{% else %}出库库位{% endif %}</span>
+          <strong>{% if kind == 'transfer' %}{{ order.from_location.code }}{% else %}{{ order.location.code }}{% endif %}</strong>
+          <small>{% if kind == 'transfer' %}{{ order.from_location.name }} · {{ order.from_location.warehouse.name }}{% else %}{{ order.location.name }} · {{ order.location.warehouse.name }}{% endif %}</small>
+        </div>
+        <div class="route-line">
+          <span>{{ order.quantity|qty }} {{ order.herb.unit }}</span>
+          <i></i>
+          <em>{% if kind == 'transfer' %}库位转移{% else %}离开仓库{% endif %}</em>
+        </div>
+        <div class="route-point route-point-in">
+          <span class="route-kicker">{% if kind == 'transfer' %}移入库位{% else %}领用 / 去向{% endif %}</span>
+          <strong>{% if kind == 'transfer' %}{{ order.to_location.code }}{% else %}{{ order.recipient }}{% endif %}</strong>
+          <small>{% if kind == 'transfer' %}{{ order.to_location.name }} · {{ order.to_location.warehouse.name }}{% else %}{{ order.purpose }}{% endif %}</small>
+        </div>
+      </div>
+
+      <dl class="info-grid">
+        <div><dt>药材</dt><dd><strong>{{ order.herb.name }}</strong> <span class="code">{{ order.herb.code }}</span></dd></div>
+        <div><dt>规格 / 单位</dt><dd>{{ order.herb.spec|default:"—" }} / {{ order.herb.unit }}</dd></div>
+        <div><dt>批次号</dt><dd><span class="code">{{ order.batch_no }}</span></dd></div>
+        <div><dt>数量</dt><dd class="info-strong">{{ order.quantity|qty }} {{ order.herb.unit }}</dd></div>
+        <div class="info-full"><dt>{% if kind == 'transfer' %}移库原因{% else %}出库用途{% endif %}</dt><dd>{% if kind == 'transfer' %}{{ order.reason }}{% else %}{{ order.purpose }}{% endif %}</dd></div>
+        <div><dt>创建时间</dt><dd>{{ order.created_at|date:"Y-m-d H:i:s" }}</dd></div>
+        <div><dt>最后更新</dt><dd>{{ order.updated_at|date:"Y-m-d H:i:s" }}</dd></div>
+      </dl>
+    </section>
+
+    {% if order.exception_note %}
+    <section class="panel exception-panel">
+      <div class="panel-head">
+        <div><h2>异常备注</h2><p>执行过程中的问题与处理说明</p></div>
+        <span class="exception-badge">异常留档</span>
+      </div>
+      <div class="exception-note">{{ order.exception_note|linebreaksbr }}</div>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>附件档案</h2><p>交接单、异常照片、审批材料等，单文件不超过 5 MB</p></div>
+        <span class="count-chip">{{ attachments|length }} 个附件</span>
+      </div>
+
+      {% if attachments %}
+      <div class="attachment-list">
+        {% for attachment in attachments %}
+        <div class="attachment-item">
+          <span class="file-icon {% if attachment.is_image %}file-image{% else %}file-doc{% endif %}">
+            {% if attachment.is_image %}图{% else %}文{% endif %}
+          </span>
+          <div class="attachment-meta">
+            <a href="{{ attachment.file.url }}" target="_blank" rel="noopener">{{ attachment.original_name }}</a>
+            <small>
+              {{ attachment.size_display }} · {{ attachment.uploaded_by.profile.display_name|default:attachment.uploaded_by.username }} · {{ attachment.created_at|date:"m-d H:i" }}
+              {% if attachment.note %} · {{ attachment.note }}{% endif %}
+            </small>
+          </div>
+          {% if can_manage_attachments or attachment.uploaded_by_id == request.user.id and order.status != 'completed' %}
+          <form method="post" action="{% url 'attachment_delete' attachment.pk %}" class="inline-form" onsubmit="return confirm('确定删除这个附件吗？');">
+            {% csrf_token %}
+            <button type="submit" class="icon-btn danger" title="删除附件" aria-label="删除附件">×</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-inline compact">还没有附件。{% if can_add_attachment %}可在下方上传交接单或异常照片。{% endif %}</div>
+      {% endif %}
+
+      {% if can_add_attachment %}
+      <form method="post" action="{{ attachment_url }}" enctype="multipart/form-data" class="upload-form">
+        {% csrf_token %}
+        <div class="upload-row">
+          <label class="upload-file">
+            {{ attachment_form.file }}
+            <span class="upload-hint">点击选择文件 · PDF / 图片 / Office 文档</span>
+          </label>
+          <input type="text" name="note" class="form-input upload-note" maxlength="200" placeholder="附件说明（可选）">
+          <button type="submit" class="btn btn-ghost">上传附件</button>
+        </div>
+      </form>
+      {% endif %}
+    </section>
+
+    {% if movements %}
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>库存流水</h2><p>本单执行后对库存的真实影响，可回溯到批次</p></div>
+        <span class="count-chip">不可篡改</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table compact-table">
+          <thead><tr><th>库位</th><th>批次</th><th>类型</th><th class="num">变动</th><th class="num">变动前</th><th class="num">变动后</th><th>时间</th></tr></thead>
+          <tbody>
+            {% for movement in movements %}
+            <tr>
+              <td>{{ movement.batch.location.code }}</td>
+              <td>{{ movement.batch.batch_no }}</td>
+              <td>{{ movement.get_movement_type_display }}</td>
+              <td class="num {% if movement.is_increase %}qty-in{% else %}qty-out{% endif %}">{{ movement.quantity|signed }} {{ order.herb.unit }}</td>
+              <td class="num">{{ movement.before_quantity|qty }}</td>
+              <td class="num">{{ movement.after_quantity|qty }}</td>
+              <td>{{ movement.created_at|date:"m-d H:i:s" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>操作轨迹</h2><p>建单、提交、审核、执行、异常与附件操作的完整时间线</p></div>
+        <span class="count-chip">{{ logs|length }} 条记录</span>
+      </div>
+      <ol class="timeline">
+        {% for log in logs %}
+        <li>
+          <span class="timeline-dot dot-{{ log.action }}"></span>
+          <div class="timeline-body">
+            <p>
+              <strong>{{ log.operator.profile.display_name|default:log.operator.username|default:"系统" }}</strong>
+              <span class="timeline-action">{{ log.get_action_display }}</span>
+              {% if log.from_status != log.to_status %}
+                <span class="status status-sm status-{% if log.to_status == 'pending' %}warning{% elif log.to_status == 'approved' %}info{% elif log.to_status == 'completed' %}success{% elif log.to_status == 'rejected' %}danger{% elif log.to_status == 'cancelled' %}muted{% else %}neutral{% endif %}">{{ log.from_status_label }} → {{ log.to_status_label }}</span>
+              {% endif %}
+            </p>
+            {% if log.comment %}<small>{{ log.comment }}</small>{% endif %}
+          </div>
+          <time>{{ log.created_at|date:"Y-m-d H:i:s" }}</time>
+        </li>
+        {% empty %}
+        <li class="timeline-empty">暂无操作记录。</li>
+        {% endfor %}
+      </ol>
+    </section>
+  </div>
+
+  <aside class="detail-side">
+    {% if can_review or can_complete or can_submit or can_cancel %}
+    <section class="panel action-panel">
+      <div class="action-panel-head">
+        <span class="action-kicker">待办操作</span>
+        <h2>
+          {% if order.status == 'pending' %}等待主管审核{% elif order.status == 'approved' %}等待库存执行{% elif order.status == 'draft' %}等待提交{% else %}单据处理{% endif %}
+        </h2>
+      </div>
+
+      {% if order.status == 'pending' %}
+        {% if can_review %}
+          {% if is_self_review %}
+          <div class="permission-note">你是本单申请人，不能自审。请由另一位仓库主管处理。</div>
+          {% else %}
+          <form method="post" action="{{ approve_url }}" class="review-form">
+            {% csrf_token %}
+            <label class="field-label" for="approve-comment">审核意见（可选）</label>
+            <textarea name="comment" id="approve-comment" class="form-input" rows="3" maxlength="300" placeholder="确认数量、批次与库位无误。"></textarea>
+            <button type="submit" class="btn btn-primary btn-block">审核通过</button>
+          </form>
+          <button type="button" class="btn btn-danger-ghost btn-block" data-dialog-open="reject-dialog">驳回单据</button>
+          {% endif %}
+        {% else %}
+        <p class="side-muted">等待仓库主管审核。当前账号没有审核权限。</p>
+        {% endif %}
+      {% elif order.status == 'approved' %}
+        {% if can_complete %}
+        <p class="side-muted">请核对实物、批次和库位后确认执行。系统将锁定库存并写入流水。</p>
+        <button type="button" class="btn btn-primary btn-block" data-dialog-open="complete-dialog">确认{% if kind == 'transfer' %}移库{% else %}出库{% endif %}完成</button>
+        {% else %}
+        <p class="side-muted">单据已审核，等待仓管员执行库存操作。</p>
+        {% endif %}
+      {% elif order.status == 'draft' %}
+        {% if can_submit %}
+        <p class="side-muted">草稿尚未进入审核队列，提交前系统会再次预检库存。</p>
+        <form method="post" action="{{ submit_url }}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary btn-block">提交审核 →</button>
+        </form>
+        {% else %}
+        <p class="side-muted">这是他人创建的草稿，只有申请人可以提交。</p>
+        {% endif %}
+      {% elif order.status == 'rejected' %}
+        <p class="side-muted">单据被驳回。{% if can_edit %}修改内容后可重新提交审核。{% else %}等待申请人修改。{% endif %}</p>
+        {% if can_edit %}<a href="{{ edit_url }}" class="btn btn-primary btn-block">编辑并重新提交</a>{% endif %}
+      {% elif order.status == 'completed' %}
+        <div class="done-seal"><span>✓</span><strong>库存已同步</strong><small>{{ order.completed_at|date:"Y-m-d H:i" }}</small></div>
+      {% endif %}
+
+      {% if can_cancel %}
+      <button type="button" class="text-danger-link" data-dialog-open="cancel-dialog">取消这张单据</button>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="panel side-card">
+      <div class="side-card-head"><h2>库存核对</h2><span class="live-dot">批次级</span></div>
+      {% if stock %}
+      <div class="inventory-figure">
+        <span>{% if kind == 'transfer' %}移出库位库存{% else %}出库库位库存{% endif %}</span>
+        <strong>{{ stock.quantity|qty }}<small>{{ order.herb.unit }}</small></strong>
+        <em>{{ stock.location.code }} · {{ order.batch_no }}</em>
+      </div>
+      {% else %}
+      <div class="inventory-figure is-empty">
+        <span>当前批次库存</span>
+        <strong>0<small>{{ order.herb.unit }}</small></strong>
+        <em>该批次库存已不足或不存在</em>
+      </div>
+      {% endif %}
+      {% if kind == 'transfer' %}
+      <div class="inventory-figure inventory-target">
+        <span>移入库位现有</span>
+        <strong>{% if destination_stock %}{{ destination_stock.quantity|qty }}{% else %}0{% endif %}<small>{{ order.herb.unit }}</small></strong>
+        <em>{{ order.to_location.code }}</em>
+      </div>
+      {% endif %}
+      <p class="side-footnote">库存以“药材 + 库位 + 批次”为唯一维度；确认执行时会锁定对应库存行。</p>
+    </section>
+
+    <section class="panel side-card">
+      <h2>审核信息</h2>
+      <dl class="meta-list">
+        <div><dt>申请人</dt><dd>{{ order.applicant.profile.display_name|default:order.applicant.username }}</dd></div>
+        <div><dt>提交时间</dt><dd>{% if order.submitted_at %}{{ order.submitted_at|date:"Y-m-d H:i" }}{% else %}尚未提交{% endif %}</dd></div>
+        <div><dt>审核人</dt><dd>{% if order.auditor %}{{ order.auditor.profile.display_name|default:order.auditor.username }}{% else %}—{% endif %}</dd></div>
+        <div><dt>审核时间</dt><dd>{% if order.audited_at %}{{ order.audited_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd></div>
+        <div><dt>完成时间</dt><dd>{% if order.completed_at %}{{ order.completed_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd></div>
+      </dl>
+      {% if order.review_comment %}
+      <div class="review-quote">
+        <span>审核意见</span>
+        <p>{{ order.review_comment }}</p>
+      </div>
+      {% endif %}
+    </section>
+
+    {% if can_annotate %}
+    <section class="panel side-card note-form-card">
+      <h2>补充异常备注</h2>
+      <form method="post" action="{{ exception_url }}">
+        {% csrf_token %}
+        <textarea name="note" class="form-input" rows="3" maxlength="500" required placeholder="记录执行异常、处理方案或交接说明…"></textarea>
+        <button type="submit" class="btn btn-ghost btn-block">追加备注</button>
+      </form>
+      <p class="side-footnote">备注会带时间与操作人追加，不会覆盖历史。</p>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+
+{% if can_review and order.status == 'pending' and not is_self_review %}
+<dialog class="app-dialog" id="reject-dialog">
+  <form method="post" action="{{ reject_url }}">
+    {% csrf_token %}
+    <div class="dialog-head"><h2>驳回{{ kind_label }}</h2><button type="button" class="dialog-close" data-dialog-close>×</button></div>
+    <p class="dialog-desc">驳回后申请人可修改并重新提交。请写明数量、批次或手续上的具体问题。</p>
+    <label class="field-label" for="reject-comment">驳回原因 <em>*</em></label>
+    <textarea name="comment" id="reject-comment" class="form-input" rows="4" maxlength="300" required placeholder="例如：批次号与实物不一致，请核对后重新提交。"></textarea>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-ghost" data-dialog-close>取消</button>
+      <button type="submit" class="btn btn-danger">确认驳回</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{% if can_complete and order.status == 'approved' %}
+<dialog class="app-dialog" id="complete-dialog">
+  <form method="post" action="{{ complete_url }}">
+    {% csrf_token %}
+    <div class="dialog-head"><h2>确认{% if kind == 'transfer' %}移库{% else %}出库{% endif %}完成</h2><button type="button" class="dialog-close" data-dialog-close>×</button></div>
+    <p class="dialog-desc">确认后将立即{% if kind == 'transfer' %}扣减 {{ order.from_location.code }}、增加 {{ order.to_location.code }}{% else %}扣减 {{ order.location.code }}{% endif %}库存，并生成库存流水。此操作不可撤销。</p>
+    <div class="dialog-summary">
+      <span>{{ order.herb.name }}</span>
+      <strong>{{ order.quantity|qty }} {{ order.herb.unit }}</strong>
+      <small>批次 {{ order.batch_no }}</small>
+    </div>
+    <label class="field-label" for="complete-comment">执行说明（可选）</label>
+    <textarea name="comment" id="complete-comment" class="form-input" rows="3" maxlength="300" placeholder="例如：实物已核对，交接人张医师。"></textarea>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-ghost" data-dialog-close>取消</button>
+      <button type="submit" class="btn btn-primary">确认执行</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+{% if can_cancel %}
+<dialog class="app-dialog" id="cancel-dialog">
+  <form method="post" action="{{ cancel_url }}">
+    {% csrf_token %}
+    <div class="dialog-head"><h2>取消{{ kind_label }}</h2><button type="button" class="dialog-close" data-dialog-close>×</button></div>
+    <p class="dialog-desc">取消后本单不会再进入审核或执行环节，历史轨迹仍会保留。</p>
+    <label class="field-label" for="cancel-reason">取消原因（可选）</label>
+    <textarea name="reason" id="cancel-reason" class="form-input" rows="3" maxlength="300" placeholder="例如：业务需求取消，药材暂不移库。"></textarea>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-ghost" data-dialog-close>返回</button>
+      <button type="submit" class="btn btn-danger">确认取消单据</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}

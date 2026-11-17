@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}药材资料{% endblock %}
+{% block breadcrumb %}基础资料 / 药材资料{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">学生 2 · 药材与库存</p>
+    <h1>药材资料</h1>
+    <p class="page-sub">维护药材编码、规格、单位和安全库存。药材是库存批次、入库、移库和出库明细的基础。</p>
+  </div>
+  {% if can_manage %}<a href="{% url 'herb_create' %}" class="btn btn-primary">＋ 新增药材</a>{% endif %}
+</section>
+
+<section class="stat-grid compact-stats">
+  <article class="stat-card"><div class="stat-top"><span>药材总数</span><span class="stat-icon green">药</span></div><strong class="stat-value">{{ stats.herbs }}<small> 味</small></strong><p class="stat-note">含停用药材</p></article>
+  <article class="stat-card"><div class="stat-top"><span>启用药材</span><span class="stat-icon blue">用</span></div><strong class="stat-value">{{ stats.active }}<small> 味</small></strong><p class="stat-note">可建立库存和业务单据</p></article>
+  <article class="stat-card"><div class="stat-top"><span>低库存批次</span><span class="stat-icon amber">低</span></div><strong class="stat-value">{{ stats.low_batches }}<small> 批</small></strong><p class="stat-note">低于安全库存</p></article>
+</section>
+
+<section class="panel filter-panel">
+  <form method="get" class="filter-form">
+    <label class="filter-field filter-search"><span>关键字</span><input type="search" name="q" value="{{ filters.q }}" class="form-input" placeholder="药材名称 / 编码 / 规格"></label>
+    <label class="filter-field"><span>类别</span><select name="category" class="form-select"><option value="">全部类别</option>{% for category in categories %}<option value="{{ category }}" {% if filters.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></label>
+    <label class="filter-field"><span>状态</span><select name="active" class="form-select"><option value="">全部</option><option value="1" {% if filters.active == '1' %}selected{% endif %}>启用</option><option value="0" {% if filters.active == '0' %}selected{% endif %}>停用</option></select></label>
+    <div class="filter-actions"><button class="btn btn-primary">筛选</button><a href="{% url 'herb_list' %}" class="btn btn-ghost">重置</a></div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head list-head"><div><h2>药材清单</h2><p>共 {{ page_obj.paginator.count }} 味</p></div><a href="{% url 'stock_list' %}" class="text-link">查看全部库存 →</a></div>
+  {% if herbs %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>药材</th><th>规格 / 单位</th><th>类别</th><th class="num">安全库存</th><th class="num">当前库存</th><th class="num">批次</th><th>状态</th><th></th></tr></thead>
+      <tbody>
+        {% for herb in herbs %}
+        <tr>
+          <td><a class="order-link" href="{% url 'herb_detail' herb.pk %}">{{ herb.name }}</a><small class="cell-sub">{{ herb.code }}</small></td>
+          <td>{{ herb.spec|default:"—" }} / {{ herb.unit }}</td>
+          <td>{{ herb.category|default:"—" }}</td>
+          <td class="num">{{ herb.safety_stock|qty }}</td>
+          <td class="num"><strong>{{ herb.stock_total|default:0|qty }}</strong> <small>{{ herb.unit }}</small></td>
+          <td class="num">{{ herb.batch_count }}</td>
+          <td>{% if herb.is_active %}<span class="status status-success">启用</span>{% else %}<span class="status status-muted">停用</span>{% endif %}</td>
+          <td class="row-action"><a href="{% url 'herb_detail' herb.pk %}" class="btn btn-tiny">详情</a>{% if can_manage %}<a href="{% url 'herb_edit' herb.pk %}" class="btn btn-tiny">编辑</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<div class="empty-inline">没有符合条件的药材。{% if can_manage %}<a href="{% url 'herb_create' %}">新增一味药材</a>{% endif %}</div>{% endif %}
+</section>
+{% endblock %}

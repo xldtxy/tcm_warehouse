@@ -1,0 +1,37 @@
+{% load warehouse_tags static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>库存流水查询单 · 本草仓</title>
+  <link rel="stylesheet" href="{% static 'warehouse/css/app.css' %}?v=20261030">
+</head>
+<body class="print-body">
+<div class="print-toolbar">
+  <a href="{% url 'stock_query' %}?{% query_replace %}">← 返回查询</a>
+  <button onclick="window.print()" class="btn btn-primary btn-sm">打印 / 保存 PDF</button>
+</div>
+<main class="print-page">
+  <header class="print-head">
+    <div class="print-brand"><span class="brand-seal">本</span><div><strong>本草仓</strong><small>中药仓储库位管理系统</small></div></div>
+    <div class="print-meta"><span>库存流水查询单</span><time>打印时间 {{ generated_at|date:"Y-m-d H:i" }}</time></div>
+  </header>
+  <h1>库存流水查询结果</h1>
+  <p class="print-sub">筛选条件：{% if filters.q %}关键字“{{ filters.q }}” {% endif %}{% if filters.date_from %}从 {{ filters.date_from }} {% endif %}{% if filters.date_to %}至 {{ filters.date_to }} {% endif %}{% if filters.order_type %}业务类型 {{ filters.order_type }} {% endif %}{% if filters.movement_type %}变动类型 {{ filters.movement_type }} {% endif %}{% if not filters.has_filters %}全部记录{% endif %}</p>
+  <div class="print-summary">
+    <div><span>入库合计</span><strong>{{ incoming|qty }} kg</strong></div>
+    <div><span>出库合计</span><strong>{{ outgoing|qty }} kg</strong></div>
+    <div><span>流水条数</span><strong>{{ movement_count }}</strong></div>
+  </div>
+  <table class="print-table">
+    <thead><tr><th>#</th><th>时间</th><th>业务对象 / 单号</th><th>药材</th><th>批次</th><th>库位</th><th>类型</th><th class="num">变动</th><th class="num">变动后</th><th>操作人</th></tr></thead>
+    <tbody>
+      {% for movement in movements %}
+      <tr><td>{{ forloop.counter }}</td><td>{{ movement.created_at|date:"Y-m-d H:i" }}</td><td>{{ movement.get_order_type_display }}{% if movement.order_no %}<br><small>{{ movement.order_no }}</small>{% endif %}</td><td>{{ movement.batch.herb.name }}</td><td>{{ movement.batch.batch_no }}</td><td>{{ movement.batch.location.code }}</td><td>{{ movement.get_movement_type_display }}</td><td class="num">{{ movement.quantity|signed }} {{ movement.batch.herb.unit }}</td><td class="num">{{ movement.after_quantity|qty }}</td><td>{{ movement.operator.profile.display_name|default:movement.operator.username|default:"系统" }}</td></tr>
+      {% empty %}<tr><td colspan="10" class="print-empty">没有符合条件的记录。</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  <footer class="print-foot"><span>制表：本草仓系统</span><span>审核：________________</span><span>日期：________________</span></footer>
+</main>
+</body>
+</html>

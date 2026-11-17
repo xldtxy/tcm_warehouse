@@ -1,0 +1,5 @@
+# Python 3.12+ 会自动安装 Django 6.0；Python 3.10/3.11 会解析到 Django 5.2 LTS。
+Django>=5.2,<6.1
+
+# MySQL 部署时取消注释并安装（Windows 如无编译环境，可改用 PyMySQL + pymysql.install_as_MySQLdb）
+# mysqlclient>=2.2,<3

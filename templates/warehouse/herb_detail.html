@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load warehouse_tags %}
+{% block title %}{{ herb.name }}{% endblock %}
+{% block breadcrumb %}药材资料 / {{ herb.name }}{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <a class="back-link" href="{% url 'herb_list' %}">← 返回药材清单</a>
+    <div class="detail-title-row"><h1>{{ herb.name }}</h1><span class="code">{{ herb.code }}</span>{% if herb.is_active %}<span class="status status-success">启用</span>{% else %}<span class="status status-muted">停用</span>{% endif %}</div>
+    <p class="page-sub">{{ herb.spec|default:"未填写规格" }} · {{ herb.category|default:"未分类" }} · 单位 {{ herb.unit }} · 安全库存 {{ herb.safety_stock|qty }}{{ herb.unit }}</p>
+  </div>
+  {% if can_manage %}
+  <div class="head-actions">
+    <a href="{% url 'herb_edit' herb.pk %}" class="btn btn-ghost">编辑药材</a>
+    <form method="post" action="{% url 'herb_delete' herb.pk %}" onsubmit="return confirm('确认删除药材 {{ herb.name }} 吗？有关联库存时不能删除。');">{% csrf_token %}<button class="btn btn-danger-ghost" type="submit">删除</button></form>
+  </div>
+  {% endif %}
+</section>
+
+<section class="stat-grid compact-stats">
+  <article class="stat-card"><div class="stat-top"><span>当前总库存</span><span class="stat-icon green">存</span></div><strong class="stat-value">{{ total_stock|qty }}<small>{{ herb.unit }}</small></strong><p class="stat-note">全部库位合计</p></article>
+  <article class="stat-card"><div class="stat-top"><span>库存批次</span><span class="stat-icon blue">批</span></div><strong class="stat-value">{{ batches|length }}<small> 批</small></strong><p class="stat-note">按库位与批次管理</p></article>
+  <article class="stat-card"><div class="stat-top"><span>安全库存</span><span class="stat-icon amber">安</span></div><strong class="stat-value">{{ herb.safety_stock|qty }}<small>{{ herb.unit }}</small></strong><p class="stat-note">低于此值触发库存提醒</p></article>
+</section>
+
+<div class="detail-layout">
+  <div class="detail-main">
+    <section class="panel">
+      <div class="panel-head"><div><h2>库存批次</h2><p>药材 + 库位 + 批次的库存明细</p></div><a href="{% url 'stock_create' %}" class="text-link">新增批次</a></div>
+      {% if batches %}
+      <div class="table-wrap"><table class="data-table compact-table"><thead><tr><th>库位</th><th>批次号</th><th class="num">库存</th><th>生产日期</th><th>有效期</th><th>状态</th><th></th></tr></thead><tbody>
+        {% for batch in batches %}
+        <tr><td><span class="code">{{ batch.location.code }}</span><small class="cell-sub">{{ batch.location.warehouse.name }}</small></td><td>{{ batch.batch_no }}</td><td class="num">{{ batch.quantity|qty }} {{ herb.unit }}</td><td>{{ batch.production_date|date:"Y-m-d"|default:"—" }}</td><td>{{ batch.expiry_date|date:"Y-m-d"|default:"—" }}</td><td>{% if batch.is_low_stock %}<span class="status status-warning">低库存</span>{% else %}<span class="status status-success">正常</span>{% endif %}</td><td class="row-action"><a href="{% url 'stock_detail' batch.pk %}" class="btn btn-tiny">查看</a></td></tr>
+        {% endfor %}
+      </tbody></table></div>
+      {% else %}<div class="empty-inline compact">这味药材还没有库存批次。</div>{% endif %}
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>最近库存流水</h2><p>最近 30 条库存变化</p></div><a href="{% url 'stock_query' %}?herb={{ herb.pk }}" class="text-link">完整查询 →</a></div>
+      {% if movements %}
+      <div class="table-wrap"><table class="data-table compact-table"><thead><tr><th>时间</th><th>单号</th><th>库位</th><th>类型</th><th class="num">变动</th><th>操作人</th></tr></thead><tbody>
+        {% for movement in movements %}
+        <tr><td>{{ movement.created_at|date:"m-d H:i" }}</td><td>{% if movement.order_type == 'inbound' and movement.order_id %}<a href="{% url 'inbound_detail' movement.order_id %}" class="order-link">{{ movement.order_no }}</a>{% elif movement.order_type == 'transfer' and movement.order_id %}<a href="{% url 'transfer_detail' movement.order_id %}" class="order-link">{{ movement.order_no }}</a>{% elif movement.order_type == 'outbound' and movement.order_id %}<a href="{% url 'outbound_detail' movement.order_id %}" class="order-link">{{ movement.order_no }}</a>{% else %}<span class="muted">期初/调整</span>{% endif %}</td><td>{{ movement.batch.location.code }}</td><td>{{ movement.get_movement_type_display }}</td><td class="num {% if movement.is_increase %}qty-in{% else %}qty-out{% endif %}">{{ movement.quantity|signed }} {{ herb.unit }}</td><td>{{ movement.operator.profile.display_name|default:movement.operator.username|default:"系统" }}</td></tr>
+        {% endfor %}
+      </tbody></table></div>
+      {% else %}<div class="empty-inline compact">还没有库存流水。</div>{% endif %}
+    </section>
+  </div>
+
+  <aside class="detail-side">
+    <section class="panel side-card">
+      <h2>基础信息</h2>
+      <dl class="meta-list"><div><dt>药材编码</dt><dd>{{ herb.code }}</dd></div><div><dt>规格</dt><dd>{{ herb.spec|default:"—" }}</dd></div><div><dt>类别</dt><dd>{{ herb.category|default:"—" }}</dd></div><div><dt>单位</dt><dd>{{ herb.unit }}</dd></div><div><dt>安全库存</dt><dd>{{ herb.safety_stock|qty }} {{ herb.unit }}</dd></div><div><dt>状态</dt><dd>{% if herb.is_active %}启用{% else %}停用{% endif %}</dd></div></dl>
+    </section>
+    <section class="panel side-card guide-card"><h2>相关操作</h2><ol class="guide-list"><li><strong>入库</strong><span><a href="{% url 'inbound_create' %}">创建入库单</a>完成采购验收入库。</span></li><li><strong>移库</strong><span><a href="{% url 'transfer_create' %}">创建移库单</a>调整库位。</span></li><li><strong>出库</strong><span><a href="{% url 'outbound_create' %}">创建出库单</a>办理领用。</span></li></ol></section>
+  </aside>
+</div>
+{% endblock %}

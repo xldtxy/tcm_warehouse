@@ -1,0 +1,128 @@
+{% load warehouse_tags static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173d32">
+  <title>{% block title %}工作台{% endblock %} · 本草仓</title>
+  <link rel="stylesheet" href="{% static 'warehouse/css/app.css' %}?v=20261030">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{% url 'dashboard' %}">
+      <span class="brand-seal">本</span>
+      <span class="brand-text">
+        <strong>本草仓</strong>
+        <small>TCM WAREHOUSE</small>
+      </span>
+    </a>
+
+    {% for group in nav_groups %}
+    <div class="sidebar-section-label">{{ group.label }}</div>
+    <nav class="main-nav" aria-label="{{ group.label }}">
+      {% for key,label in group.items %}
+      <a href="{% menu_url key %}" class="nav-link {% if active_nav == key %}active{% endif %}">
+        <span class="nav-glyph">{{ label|slice:":1" }}</span>
+        <span>{{ label }}</span>
+        {% if key == 'inbound' and nav_pending_inbounds %}<em class="nav-badge">{{ nav_pending_inbounds }}</em>{% endif %}
+        {% if key == 'transfer' and nav_pending_transfers %}<em class="nav-badge">{{ nav_pending_transfers }}</em>{% endif %}
+        {% if key == 'outbound' and nav_pending_outbounds %}<em class="nav-badge">{{ nav_pending_outbounds }}</em>{% endif %}
+      </a>
+      {% endfor %}
+    </nav>
+    {% endfor %}
+
+    <div class="sidebar-section-label">快捷处理</div>
+    <nav class="main-nav">
+      {% if 'inbound' in allowed_menus %}
+      <a href="{% url 'inbound_list' %}?status=pending" class="nav-link">
+        <span class="nav-glyph">验</span><span>待验收</span>
+      </a>
+      {% endif %}
+      {% if 'transfer' in allowed_menus %}
+      <a href="{% url 'transfer_list' %}?status=pending" class="nav-link">
+        <span class="nav-glyph">审</span><span>移库待审核</span>
+      </a>
+      {% endif %}
+      {% if 'outbound' in allowed_menus %}
+      <a href="{% url 'outbound_list' %}?status=approved" class="nav-link">
+        <span class="nav-glyph">行</span><span>出库待执行</span>
+      </a>
+      {% endif %}
+      {% if request.user.is_staff %}
+      <a href="{% url 'admin:index' %}" class="nav-link">
+        <span class="nav-glyph">后</span><span>Django 后台</span>
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="user-card">
+        <span class="user-avatar">{{ request.user.profile.display_name|slice:":1" }}</span>
+        <span class="user-meta">
+          <strong>{{ request.user.profile.display_name }}</strong>
+          <small>{{ request.user.profile.get_role_display }}</small>
+        </span>
+        <form action="{% url 'logout' %}" method="post" class="logout-form">
+          {% csrf_token %}
+          <button type="submit" class="icon-btn" title="退出登录" aria-label="退出登录">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5m5 5H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
+          </button>
+        </form>
+      </div>
+      <p class="sidebar-note">中药仓储库位管理系统<br>学生 1-5 · 全流程业务闭环</p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="mobile-menu icon-btn" type="button" id="menu-toggle" aria-label="展开导航">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="topbar-title">{% block breadcrumb %}工作台{% endblock %}</div>
+      <div class="topbar-actions">
+        <span class="topbar-date">{% now "Y年n月j日" %}</span>
+        {% if role_permissions|get_item:'inbound.create' %}
+        <a href="{% url 'inbound_create' %}" class="btn btn-primary btn-sm">
+          <span class="plus">＋</span> 新建入库
+        </a>
+        {% endif %}
+        {% if role_permissions|get_item:'transfer.create' %}
+        <a href="{% url 'transfer_create' %}" class="btn btn-ghost btn-sm">新建移库</a>
+        {% endif %}
+        {% if role_permissions|get_item:'outbound.create' %}
+        <a href="{% url 'outbound_create' %}" class="btn btn-ghost btn-sm">新建出库</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <div class="content">
+      {% block content %}{% endblock %}
+      <footer class="page-footer">
+        <span>本草仓 · Python + Django 课程实践</span>
+        <span>业务流程：入库验收 → 库存管理 → 移库 / 出库 → 查询与审计</span>
+      </footer>
+    </div>
+  </main>
+</div>
+
+{% if messages %}
+<div class="toast-stack" id="toast-stack" aria-live="polite">
+  {% for message in messages %}
+  <div class="toast toast-{{ message.tags }}" role="status">
+    <span class="toast-dot"></span>
+    <span>{{ message }}</span>
+    <button type="button" class="toast-close" aria-label="关闭">×</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<datalist id="transfer-batch-options"></datalist>
+<datalist id="outbound-batch-options"></datalist>
+<script src="{% static 'warehouse/js/app.js' %}?v=20261030"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>
